@@ -95,12 +95,10 @@ export function drawPetalShape(ctx, cx, cy, angle, length, width, color1, color2
     ctx.rotate(angle);
     const hw = length * width;
 
-    // Gradient fill
-    const g = ctx.createLinearGradient(0, 0, 0, -length);
-    g.addColorStop(0, color1);
-    g.addColorStop(.6, color2 || lighten(color1, .25));
-    g.addColorStop(1, lighten(color1, .4));
-    ctx.fillStyle = g;
+    // Monochromatic petal: choose either a darker or lighter shade of the primary color
+    // We'll use color1 as the base and make the entire petal a consistent shade
+    const petalShade = Math.random() > 0.5 ? darken(color1, 0.1) : lighten(color1, 0.1);
+    ctx.fillStyle = petalShade;
 
     ctx.beginPath();
     ctx.moveTo(0, 0);

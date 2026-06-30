@@ -78,8 +78,8 @@ function apply3DTransform(ctx, canvas, tiltAngle) {
  * @param {number} lightAngle
  */
 function drawLightingEffect(ctx, cx, cy, radius, lightAngle) {
-    const lightX = cx + Math.cos(lightAngle) * radius * 0.3;
-    const lightY = cy + Math.sin(lightAngle) * radius * 0.3;
+    const lightX = cx + Math.cos(lightAngle) * radius * 0.83;
+    const lightY = cy + Math.sin(lightAngle) * radius * 0.83;
     
     const specGrad = ctx.createRadialGradient(lightX, lightY, 0, cx, cy, radius);
     specGrad.addColorStop(0, 'rgba(255, 255, 255, 0.25)');
@@ -125,11 +125,10 @@ function drawPetalShape(ctx, cx, cy, angle, length, width, color1, color2, highl
     ctx.rotate(angle);
     const hw = length * width;
 
-    const g = ctx.createLinearGradient(0, 0, 0, -length);
-    g.addColorStop(0, color1);
-    g.addColorStop(.6, color2 || lighten(color1, .25));
-    g.addColorStop(1, lighten(color1, .4));
-    ctx.fillStyle = g;
+    // Monochromatic petal: choose either a darker or lighter shade of the primary color
+    // We'll use color1 as the base and make the entire petal a consistent shade
+    const petalShade = Math.random() > 0.8 ? darken(color1, 0.3) : lighten(color1, 0.3);
+    ctx.fillStyle = petalShade;
 
     ctx.beginPath();
     ctx.moveTo(0, 0);
@@ -142,11 +141,11 @@ function drawPetalShape(ctx, cx, cy, angle, length, width, color1, color2, highl
     ctx.stroke();
 
     if (outline) {
-        ctx.strokeStyle = rgba(darken(color1, .35), .55);
-        ctx.lineWidth = 1.2;
+        ctx.strokeStyle = rgba(darken(color1, .35), .85);
+        ctx.lineWidth = 2.2;
         ctx.beginPath();
         ctx.moveTo(0, 0);
-        ctx.bezierCurveTo(-hw * .8, -length * .25, -hw, -length * .7, 0, -length);
+        ctx.bezierCurveTo(-hw * 1.8, -length * .25, -hw, -length * .7, 0, -length);
         ctx.bezierCurveTo(hw, -length * .7, hw * .8, -length * .25, 0, 0);
         ctx.stroke();
     }

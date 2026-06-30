@@ -10,10 +10,9 @@
  * @param {string} stColor - stamen color
  */
 function drawPistil(ctx, f, r, t, stLen, stColor) {
-    const windAngle = Math.sin(t * 0.15) * TAU;
-    const windX = Math.cos(windAngle) * Math.sin(t * 0.7) * 1.5;
-    const windY = Math.sin(windAngle) * Math.sin(t * 0.7) * 1.5;
-    const pistilSway = Math.sin(t * 1.0 + 2) * 0.04;
+    const windX = 0;
+    const windY = 0;
+    const pistilSway = 0;
     const pistilLen = stLen * 0.35;
     ctx.save();
     ctx.translate(windX, windY);
@@ -56,26 +55,11 @@ function drawCenterTriangles(ctx, cx, cy, cr, color1, color2, t) {
     const oy = cy - cr;
 
     // More complex animation for boiling/wave effect
-    const waveFreq = 0.25;
-    const waveAmp = s * 0.25;
-    const timePhase = (t || performance.now() / 1000) * waveFreq;
-
     for (let row = 0; row < rows; row++) {
         for (let col = 0; col < cols; col++) {
-            // Calculate position with wave distortion
-            const baseX = ox + col * s + (row % 2) * s * 0.5;
-            const baseY = oy + row * h;
-            
-            // Wave distortion
-            const waveX = Math.sin(timePhase + baseX * 0.02) * waveAmp;
-            const waveY = Math.cos(timePhase * 0.7 + baseY * 0.02) * waveAmp;
-            
-            // Add some noise for organic feel
-            const noiseX = Math.sin(timePhase * 1.3 + row * 0.7 + col * 0.5) * s * 0.1;
-            const noiseY = Math.cos(timePhase * 0.9 + row * 0.5 + col * 0.7) * h * 0.1;
-            
-            const x = baseX + waveX + noiseX;
-            const y = baseY + waveY + noiseY;
+            // Calculate fixed position without animation
+            const x = ox + col * s + (row % 2) * s * 0.5;
+            const y = oy + row * h;
             
             const alt = (row + col) % 2 === 0;
             ctx.fillStyle = alt ? rgba(color1, 0.6) : rgba(color2, 0.6);
@@ -148,27 +132,12 @@ function drawCenterSquares(ctx, cx, cy, cr, color1, color2, t) {
     ctx.lineWidth = 0.3;
 
     // More complex animation for boiling/wave effect
-    const waveFreq = 0.2;
-    const waveAmp = cell * 0.2;
-    const timePhase = (t || performance.now() / 1000) * waveFreq;
-
     // Large squares at grid intersections
     for (let i = -extent; i <= extent; i++) {
         for (let j = -extent; j <= extent; j++) {
-            // Calculate base position
-            const baseLx = cx + i * cell - L / 2;
-            const baseLy = cy + j * cell - L / 2;
-            
-            // Wave distortion
-            const waveX = Math.sin(timePhase + baseLx * 0.015) * waveAmp;
-            const waveY = Math.cos(timePhase * 0.8 + baseLy * 0.015) * waveAmp;
-            
-            // Add some noise for organic feel
-            const noiseX = Math.sin(timePhase * 1.1 + i * 0.5 + j * 0.3) * cell * 0.1;
-            const noiseY = Math.cos(timePhase * 0.9 + i * 0.3 + j * 0.5) * cell * 0.1;
-            
-            const lx = baseLx + waveX + noiseX;
-            const ly = baseLy + waveY + noiseY;
+            // Fixed position without animation
+            const lx = cx + i * cell - L / 2;
+            const ly = cy + j * cell - L / 2;
             
             const alt = (i + j) % 2 === 0;
             const base = alt ? color1 : color2;
@@ -576,10 +545,9 @@ if (typeof drawCenterDiamonds === 'undefined') {
 // Make functions available globally
 if (typeof drawPistil === 'undefined') {
     window.drawPistil = function(ctx, f, r, t, stLen, stColor) {
-        const windAngle = Math.sin(t * 0.15) * TAU;
-        const windX = Math.cos(windAngle) * Math.sin(t * 0.7) * 1.5;
-        const windY = Math.sin(windAngle) * Math.sin(t * 0.7) * 1.5;
-        const pistilSway = Math.sin(t * 1.0 + 2) * 0.04;
+        const windX = 0;
+        const windY = 0;
+        const pistilSway = 0;
         const pistilLen = stLen * 0.35;
         ctx.save();
         ctx.translate(windX, windY);

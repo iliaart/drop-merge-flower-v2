@@ -36,7 +36,7 @@ export function drawSimpleFlower(ctx, cx, cy, f, r, n, t, fractalDepth = 0) {
     const hasTessellation = f.hasTessellation !== undefined ? f.hasTessellation : true;
     if (hasTessellation) {
         const centerPattern = f.centerPattern || 'none';
-        drawCenterTessellation(ctx, cx, cy, cr, f.centerColor, f.centerColor2, centerPattern, t);
+        drawCenterTessellation(ctx, cx, cy, cr, f.centerColor, f.centerColor2, centerPattern, 0); // Changed t to 0 to disable animation
     }
     
     for (let i = 0; i < 12; i++) {
@@ -456,7 +456,7 @@ function drawCenterTessellation(ctx, cx, cy, cr, color1, color2, pattern, t) {
     };
 
     const drawer = drawers[pattern];
-    if (drawer) drawer(ctx, cx, cy, cr, color1, color2, t);
+    if (drawer) drawer(ctx, cx, cy, cr, color1, color2, 0); // Changed t to 0 to disable animation
 }
 
 /**
@@ -489,20 +489,9 @@ function drawCenterTriangles(ctx, cx, cy, cr, color1, color2, t) {
 
     for (let row = 0; row < rows; row++) {
         for (let col = 0; col < cols; col++) {
-            // Calculate position with wave distortion
-            const baseX = ox + col * s + (row % 2) * s * 0.5;
-            const baseY = oy + row * h;
-            
-            // Wave distortion
-            const waveX = Math.sin(timePhase + baseX * 0.02) * waveAmp;
-            const waveY = Math.cos(timePhase * 0.7 + baseY * 0.02) * waveAmp;
-            
-            // Add some noise for organic feel
-            const noiseX = Math.sin(timePhase * 1.3 + row * 0.7 + col * 0.5) * s * 0.1;
-            const noiseY = Math.cos(timePhase * 0.9 + row * 0.5 + col * 0.7) * h * 0.1;
-            
-            const x = baseX + waveX + noiseX;
-            const y = baseY + waveY + noiseY;
+            // Calculate fixed position without animation
+            const x = ox + col * s + (row % 2) * s * 0.5;
+            const y = oy + row * h;
             
             const alt = (row + col) % 2 === 0;
             ctx.fillStyle = alt ? rgba(color1, 0.6) : rgba(color2, 0.6);
@@ -771,8 +760,8 @@ function drawCenterDiamonds(ctx, cx, cy, cr, color1, color2, t) {
     
     // Draw radial diamonds around center based on the selected number of rays
     for (let i = 0; i < rays; i++) {
-        const angle = (i / rays) * TAU + timeOffset;
-        const size = cr * 0.18 * (0.95 + 0.05 * Math.sin(t * 4 + i));
+        const angle = (i / rays) * TAU;
+        const size = cr * 0.18; // Removed animation from size
         const distance = cr * 0.35;
         
         const centerX = cx + Math.cos(angle) * distance;
@@ -780,7 +769,7 @@ function drawCenterDiamonds(ctx, cx, cy, cr, color1, color2, t) {
         
         ctx.save();
         ctx.translate(centerX, centerY);
-        ctx.rotate(angle + t * 0.4);
+        ctx.rotate(angle); // Fixed rotation without animation
         
         // Diamond made of 2 triangles
         ctx.beginPath();
@@ -912,16 +901,9 @@ function drawCenterCells(ctx, cx, cy, cr, color1, color2, t) {
             const dist = Math.sqrt((x - cx) ** 2 + (y - cy) ** 2);
             if (dist > cr * 1.2) continue;
             
-            // Apply wave distortion
-            const waveX = Math.sin(timePhase + x * 0.02) * waveAmp;
-            const waveY = Math.cos(timePhase * 0.7 + y * 0.02) * waveAmp;
-            
-            // Add some noise for organic feel
-            const noiseX = Math.sin(timePhase * 1.3 + row * 0.7 + col * 0.5) * hexRadius * 0.1;
-            const noiseY = Math.cos(timePhase * 0.9 + row * 0.5 + col * 0.7) * hexHeight * 0.1;
-            
-            const finalX = x + waveX + noiseX;
-            const finalY = y + waveY + noiseY;
+            // Fixed position without animation
+            const finalX = x;
+            const finalY = y;
             
             const alt = (row + col) % 2 === 0;
             ctx.fillStyle = alt ? rgba(color1, 0.6) : rgba(color2, 0.6);

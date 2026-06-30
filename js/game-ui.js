@@ -293,5 +293,22 @@ export function drawFlower(ctx, flower, t) {
     }
     ctx.drawImage(cache.canvas, -cache.cx * 2, -cache.cy * 2, cache.canvas.width, cache.canvas.height);
     drawStamens(ctx, flower.level, r, t, flower.stamenPhase, flower.squashS);
+    
+    // Restore transformation to draw text in screen coordinates
+    ctx.restore();
+    
+    // Draw the generation number above the flower
+    ctx.save();
+    ctx.translate(pos.x, pos.y - r - 15); // Position above the flower
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.font = 'bold 12px Georgia';
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+    ctx.strokeStyle = 'rgba(0, 0, 0, 0.5)';
+    ctx.lineWidth = 1;
+    
+    // Draw text with outline
+    ctx.strokeText(`${f.generationNumber || '?'}`, 0, 0);
+    ctx.fillText(`${f.generationNumber || '?'}`, 0, 0);
     ctx.restore();
 }

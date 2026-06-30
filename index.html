@@ -87,7 +87,7 @@
         import { initGame, restart, setupInput } from './js/game.js';
         import { getAllFlowersWithGenerated } from './js/random-flowers.js';
         import { CONFIG } from './js/config.js';
-        import { generateRandomFlowerBatch, resetGeneratedFlowers } from './js/random-flowers.js';
+        import { generateRandomFlowerBatch, resetGeneratedFlowers, logGeneratedFlowers } from './js/random-flowers.js';
 
         const canvas = document.getElementById('game');
         const ctx = canvas.getContext('2d');
@@ -137,6 +137,11 @@
             // Update MAX_LEVEL to reflect only generated flowers
             CONFIG.MAX_LEVEL = getAllFlowersWithGenerated().length - 1;
             updateFlowerCount(); // Update the flower count display
+            
+            // Log information about the generated flowers to console after a short delay
+            setTimeout(() => {
+                logGeneratedFlowers();
+            }, 2000); // Wait 2 seconds to ensure flowers are fully generated before logging
             
             if (typeof Matter !== 'undefined') {
                 startGame();

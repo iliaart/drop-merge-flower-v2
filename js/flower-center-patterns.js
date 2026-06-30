@@ -29,7 +29,7 @@ export function drawCenterTessellation(ctx, cx, cy, cr, color1, color2, pattern,
 }
 
 /**
- * Draw triangular tessellation in flower center
+ * Draw triangular tessellation in flower center - kaleidoscopic pattern
  * @param {CanvasRenderingContext2D} ctx
  * @param {number} cx
  * @param {number} cy
@@ -44,78 +44,108 @@ function drawCenterTriangles(ctx, cx, cy, cr, color1, color2, t) {
     ctx.arc(cx, cy, cr, 0, TAU);
     ctx.clip();
 
-    const s = cr * 1.35;
-    const h = s * Math.sqrt(3) / 2;
-    const rows = Math.ceil(cr * 2 / h) + 1;
-    const cols = Math.ceil(cr * 2 / s) + 1;
-    const ox = cx - cr;
-    const oy = cy - cr;
-
-    // More complex animation for boiling/wave effect
+    // Create kaleidoscopic triangular pattern with many small triangles
+    const triSize = cr * 0.05; // Smaller triangles for dense pattern
+    const rings = Math.ceil(cr / triSize); // Number of rings to fill the center
+    
+    // Animation parameters
     const waveFreq = 0.25;
-    const waveAmp = s * 0.25;
+    const waveAmp = triSize * 0.2;
     const timePhase = t * waveFreq;
 
-    for (let row = 0; row < rows; row++) {
-        for (let col = 0; col < cols; col++) {
+    // Draw triangles in a radial pattern around the center
+    for (let ring = 1; ring <= rings; ring++) {
+        const ringRadius = ring * triSize;
+        // Calculate number of triangles in this ring based on circumference
+        const numTriangles = Math.max(6 * ring, Math.floor((TAU * ringRadius) / (triSize * 0.8)));
+        
+        for (let i = 0; i < numTriangles; i++) {
+            const angle = (i / numTriangles) * TAU;
+            const angleStep = TAU / numTriangles;
+            
             // Calculate position with wave distortion
-            const baseX = ox + col * s + (row % 2) * s * 0.5;
-            const baseY = oy + row * h;
+            const waveX = Math.sin(timePhase + ring * 0.5 + i * 0.3) * waveAmp;
+            const waveY = Math.cos(timePhase * 0.7 + ring * 0.3 + i * 0.5) * waveAmp;
             
-            // Wave distortion
-            const waveX = Math.sin(timePhase + baseX * 0.02) * waveAmp;
-            const waveY = Math.cos(timePhase * 0.7 + baseY * 0.02) * waveAmp;
+            // Base position on the ring
+            const baseX = cx + Math.cos(angle) * ringRadius + waveX;
+            const baseY = cy + Math.sin(angle) * ringRadius + waveY;
             
-            // Add some noise for organic feel
-            const noiseX = Math.sin(timePhase * 1.3 + row * 0.7 + col * 0.5) * s * 0.1;
-            const noiseY = Math.cos(timePhase * 0.9 + row * 0.5 + col * 0.7) * h * 0.1;
+            // Determine triangle orientation and colors
+            const alt = (ring + i) % 2 === 0;
+            const fillColor = alt ? rgba(color1, 0.6) : rgba(color2, 0.6);
             
-            const x = baseX + waveX + noiseX;
-            const y = baseY + waveY + noiseY;
-            
-            const alt = (row + col) % 2 === 0;
-            ctx.fillStyle = alt ? rgba(color1, 0.6) : rgba(color2, 0.6);
-            ctx.beginPath();
-            ctx.moveTo(x, y);
-            ctx.lineTo(x + s * 0.5, y - h);
-            ctx.lineTo(x + s, y);
-            ctx.closePath();
-            ctx.fill();
-
-            ctx.fillStyle = alt ? rgba(color2, 0.6) : rgba(color1, 0.6);
-            ctx.beginPath();
-            ctx.moveTo(x + s * 0.5, y - h);
-            ctx.lineTo(x + s, y);
-            ctx.lineTo(x + s * 1.5, y - h);
-            ctx.closePath();
-            ctx.fill();
+            // Draw multiple small triangles per position for fuller kaleidoscopic effect
+            for (let subTri = 0; subTri < 3; subTri++) {
+                const subAngle = angle + (subTri * angleStep / 3);
+                const subX = baseX + Math.cos(subAngle) * triSize * 0.3;
+                const subY = baseY + Math.sin(subAngle) * triSize * 0.3;
+                
+                // Draw a small triangle
+                ctx.fillStyle = fillColor;
+                ctx.beginPath();
+                ctx.moveTo(subX, subY);
+                
+                // Create triangle points in different directions for kaleidoscopic effect
+                const dirAngle = subAngle + (subTri * TAU / 6);
+                const p1x = subX + Math.cos(dirAngle) * triSize;
+                const p1y = subY + Math.sin(dirAngle) * triSize;
+                const p2x = subX + Math.cos(dirAngle + (TAU/3)) * triSize;
+                const p2y = subY + Math.sin(dirAngle + (TAU/3)) * triSize;
+                
+                ctx.lineTo(p1x, p1y);
+                ctx.lineTo(p2x, p2y);
+                ctx.closePath();
+                ctx.fill();
+                
+                // Draw subtle outline
+                ctx.strokeStyle = rgba(darken(alt ? color1 : color2, 0.3), 0.2);
+                ctx.lineWidth = 0.2;
+                ctx.stroke();
+            }
         }
     }
-
-    ctx.strokeStyle = rgba(darken(color1, 0.3), 0.2);
-    ctx.lineWidth = 0.3;
-    for (let row = 0; row < rows; row++) {
-        for (let col = 0; col < cols; col++) {
+    
+    // Add additional triangles in between for denser pattern
+    for (let ring = 0.5; ring < rings; ring++) {
+        if (ring === Math.floor(ring)) continue; // Skip integer rings as they're already processed
+        
+        const ringRadius = ring * triSize;
+        const numTriangles = Math.max(6 * Math.floor(ring), Math.floor((TAU * ringRadius) / (triSize * 0.7)));
+        
+        for (let i = 0; i < numTriangles; i++) {
+            const angle = (i / numTriangles) * TAU + (TAU / (numTriangles * 2)); // Offset angle
+            const angleStep = TAU / numTriangles;
+            
             // Calculate position with wave distortion
-            const baseX = ox + col * s + (row % 2) * s * 0.5;
-            const baseY = oy + row * h;
+            const waveX = Math.sin(timePhase * 0.8 + ring * 0.7 + i * 0.4) * waveAmp * 0.7;
+            const waveY = Math.cos(timePhase * 0.5 + ring * 0.4 + i * 0.7) * waveAmp * 0.7;
             
-            // Wave distortion
-            const waveX = Math.sin(timePhase + baseX * 0.02) * waveAmp;
-            const waveY = Math.cos(timePhase * 0.7 + baseY * 0.02) * waveAmp;
+            const baseX = cx + Math.cos(angle) * ringRadius + waveX;
+            const baseY = cy + Math.sin(angle) * ringRadius + waveY;
             
-            // Add some noise for organic feel
-            const noiseX = Math.sin(timePhase * 1.3 + row * 0.7 + col * 0.5) * s * 0.1;
-            const noiseY = Math.cos(timePhase * 0.9 + row * 0.5 + col * 0.7) * h * 0.1;
+            const alt = (Math.floor(ring) + i) % 2 !== 0;
+            const fillColor = alt ? rgba(color2, 0.55) : rgba(color1, 0.55);
             
-            const x = baseX + waveX + noiseX;
-            const y = baseY + waveY + noiseY;
-            
+            // Draw triangle with slightly different orientation
+            ctx.fillStyle = fillColor;
             ctx.beginPath();
-            ctx.moveTo(x, y);
-            ctx.lineTo(x + s * 0.5, y - h);
-            ctx.lineTo(x + s, y);
+            ctx.moveTo(baseX, baseY);
+            
+            const dirAngle = angle + TAU/4;
+            const p1x = baseX + Math.cos(dirAngle) * triSize * 0.8;
+            const p1y = baseY + Math.sin(dirAngle) * triSize * 0.8;
+            const p2x = baseX + Math.cos(dirAngle + (TAU/3)) * triSize * 0.8;
+            const p2y = baseY + Math.sin(dirAngle + (TAU/3)) * triSize * 0.8;
+            
+            ctx.lineTo(p1x, p1y);
+            ctx.lineTo(p2x, p2y);
             ctx.closePath();
+            ctx.fill();
+            
+            // Draw subtle outline
+            ctx.strokeStyle = rgba(darken(alt ? color1 : color2, 0.3), 0.15);
+            ctx.lineWidth = 0.15;
             ctx.stroke();
         }
     }
@@ -139,7 +169,7 @@ function drawCenterSquares(ctx, cx, cy, cr, color1, color2, t) {
     ctx.arc(cx, cy, cr, 0, TAU);
     ctx.clip();
 
-    const L = cr * 0.38;
+    const L = cr * 0.38 * 0.7; // Reduced size by 30%
     const s = L * (Math.SQRT2 - 1);  // ≈ 0.414 * L
     const cell = L + s;
     const halfCell = cell / 2;
@@ -162,7 +192,7 @@ function drawCenterSquares(ctx, cx, cy, cr, color1, color2, t) {
             
             // Wave distortion
             const waveX = Math.sin(timePhase + baseLx * 0.015) * waveAmp;
-            const waveY = Math.cos(timePhase * 0.8 + baseLy * 0.015) * waveAmp;
+            const waveY = Math.cos(timePhase * 0.7 + baseLy * 0.015) * waveAmp;
             
             // Add some noise for organic feel
             const noiseX = Math.sin(timePhase * 1.1 + i * 0.5 + j * 0.3) * cell * 0.1;
@@ -177,9 +207,21 @@ function drawCenterSquares(ctx, cx, cy, cr, color1, color2, t) {
             g.addColorStop(0, rgba(lighten(base, 0.1), 0.65));
             g.addColorStop(1, rgba(darken(base, 0.05), 0.55));
             ctx.fillStyle = g;
+            
+            // Save context before transformation to avoid rotation accumulation
+            ctx.save();
+            ctx.translate(lx + L/2, ly + L/2); // Move to center of square
+            // Apply a subtle, smooth rotation instead of sharp twisting
+            const rotation = Math.sin(timePhase * 0.5 + i * 0.1 + j * 0.1) * 0.2; // Much more subtle rotation
+            ctx.rotate(rotation);
+            ctx.translate(-(lx + L/2), -(ly + L/2)); // Move back
+            
             ctx.fillRect(lx, ly, L, L);
             ctx.strokeStyle = strokeCol;
             ctx.strokeRect(lx, ly, L, L);
+            
+            // Restore context
+            ctx.restore();
         }
     }
 
@@ -192,7 +234,7 @@ function drawCenterSquares(ctx, cx, cy, cr, color1, color2, t) {
             
             // Wave distortion
             const waveX = Math.sin(timePhase + baseSx * 0.015) * waveAmp;
-            const waveY = Math.cos(timePhase * 0.8 + baseSy * 0.015) * waveAmp;
+            const waveY = Math.cos(timePhase * 0.7 + baseSy * 0.015) * waveAmp;
             
             // Add some noise for organic feel
             const noiseX = Math.sin(timePhase * 1.1 + i * 0.5 + j * 0.3) * cell * 0.1;
@@ -207,9 +249,21 @@ function drawCenterSquares(ctx, cx, cy, cr, color1, color2, t) {
             g.addColorStop(0, rgba(lighten(base, 0.15), 0.7));
             g.addColorStop(1, rgba(darken(base, 0.1), 0.6));
             ctx.fillStyle = g;
+            
+            // Save context before transformation for small squares
+            ctx.save();
+            ctx.translate(sx + s/2, sy + s/2); // Move to center of square
+            // Apply a subtle, smooth rotation instead of sharp twisting
+            const smallRotation = Math.cos(timePhase * 0.4 + i * 0.15 + j * 0.15) * 0.15; // Even subtler rotation for small squares
+            ctx.rotate(smallRotation);
+            ctx.translate(-(sx + s/2), -(sy + s/2)); // Move back
+            
             ctx.fillRect(sx, sy, s, s);
             ctx.strokeStyle = strokeCol;
             ctx.strokeRect(sx, sy, s, s);
+            
+            // Restore context
+            ctx.restore();
         }
     }
 
@@ -484,7 +538,7 @@ function drawCenterDiamonds(ctx, cx, cy, cr, color1, color2, t) {
 }
 
 /**
- * Draw cellular (hexagon/square) tessellation in flower center
+ * Draw cellular (distorted circle) tessellation in flower center
  * @param {CanvasRenderingContext2D} ctx
  * @param {number} cx
  * @param {number} cy
@@ -499,64 +553,70 @@ function drawCenterCells(ctx, cx, cy, cr, color1, color2, t) {
     ctx.arc(cx, cy, cr, 0, TAU);
     ctx.clip();
 
-    // Hexagonal cells (honeycomb pattern)
-    const hexRadius = cr * 0.12;
-    const hexHeight = Math.sqrt(3) * hexRadius;
-    const hexWidth = 2 * hexRadius;
+    // Distorted circles (cell-like appearance)
+    const cellRadius = cr * 0.08;
+    const cellDiameter = cellRadius * 2;
     
     // Calculate number of rows and columns needed to fill the circle
-    const rows = Math.ceil(cr * 2 / (hexHeight * 0.75)) + 1;
-    const cols = Math.ceil(cr * 2 / (hexWidth * 0.75)) + 1;
+    const rows = Math.ceil(cr * 2 / cellDiameter) + 1;
+    const cols = Math.ceil(cr * 2 / cellDiameter) + 1;
     
-    const offsetX = cx - (cols * hexWidth * 0.75) / 2;
-    const offsetY = cy - (rows * hexHeight) / 2;
+    const offsetX = cx - (cols * cellDiameter) / 2;
+    const offsetY = cy - (rows * cellDiameter) / 2;
 
     // Animation parameters
     const waveFreq = 0.18;
-    const waveAmp = hexRadius * 0.3;
+    const waveAmp = cellRadius * 0.3;
     const timePhase = t * waveFreq;
 
     for (let row = 0; row < rows; row++) {
         for (let col = 0; col < cols; col++) {
-            // Offset every other row for honeycomb pattern
-            const x = offsetX + col * hexWidth * 0.75 + (row % 2) * (hexWidth * 0.75 / 2);
-            const y = offsetY + row * hexHeight * 0.75;
+            const x = offsetX + col * cellDiameter;
+            const y = offsetY + row * cellDiameter;
             
-            // Check if this hexagon is within our circular clipping area
+            // Check if this circle is within our circular clipping area
             const dist = Math.sqrt((x - cx) ** 2 + (y - cy) ** 2);
-            if (dist > cr * 1.2) continue;
+            if (dist > cr * 1.1) continue;
             
             // Apply wave distortion
             const waveX = Math.sin(timePhase + x * 0.02) * waveAmp;
             const waveY = Math.cos(timePhase * 0.7 + y * 0.02) * waveAmp;
             
             // Add some noise for organic feel
-            const noiseX = Math.sin(timePhase * 1.3 + row * 0.7 + col * 0.5) * hexRadius * 0.1;
-            const noiseY = Math.cos(timePhase * 0.9 + row * 0.5 + col * 0.7) * hexHeight * 0.1;
+            const noiseX = Math.sin(timePhase * 1.3 + row * 0.7 + col * 0.5) * cellRadius * 0.1;
+            const noiseY = Math.cos(timePhase * 0.9 + row * 0.5 + col * 0.7) * cellRadius * 0.1;
             
             const finalX = x + waveX + noiseX;
             const finalY = y + waveY + noiseY;
             
             const alt = (row + col) % 2 === 0;
-            ctx.fillStyle = alt ? rgba(color1, 0.6) : rgba(color2, 0.6);
+            const baseColor = alt ? color1 : color2;
             
-            // Draw hexagon
+            // Create distortion effect to make circles appear more organic/cell-like
+            const distortionFactor = 0.8 + 0.2 * Math.sin(timePhase + row + col);
+            
+            ctx.save();
+            ctx.translate(finalX, finalY);
+            ctx.scale(distortionFactor, 1/distortionFactor); // Apply distortion
+            
             ctx.beginPath();
-            for (let i = 0; i < 6; i++) {
-                const angle = i * Math.PI / 3;
-                const hx = finalX + hexRadius * Math.cos(angle);
-                const hy = finalY + hexRadius * Math.sin(angle);
-                
-                if (i === 0) ctx.moveTo(hx, hy);
-                else ctx.lineTo(hx, hy);
-            }
+            ctx.arc(0, 0, cellRadius, 0, TAU);
             ctx.closePath();
+            
+            // Create a gradient for more organic look
+            const gradient = ctx.createRadialGradient(0, 0, 0, 0, 0, cellRadius);
+            gradient.addColorStop(0, rgba(lighten(baseColor, 0.1), 0.7));
+            gradient.addColorStop(1, rgba(darken(baseColor, 0.1), 0.5));
+            
+            ctx.fillStyle = gradient;
             ctx.fill();
             
-            // Draw outline
-            ctx.strokeStyle = rgba(darken(alt ? color1 : color2, 0.3), 0.3);
+            // Draw subtle outline
+            ctx.strokeStyle = rgba(darken(baseColor, 0.3), 0.3);
             ctx.lineWidth = 0.3;
             ctx.stroke();
+            
+            ctx.restore();
         }
     }
 

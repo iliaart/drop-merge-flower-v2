@@ -56,7 +56,14 @@ function generateRandomFlower() {
     const antherSize = parseFloat(rand(0.7, 1.5).toFixed(1));
 
     const centerPatterns = ['none', 'triangles', 'squares', 'pentagons', 'diamonds', 'cells', 'stars'];
-    const centerPattern = centerPatterns[Math.floor(Math.random() * centerPatterns.length)];
+    let centerPattern;
+    
+    // For insectoid type, always use 'none' pattern (no tessellation)
+    if (flowerType === 'insectoid') {
+        centerPattern = 'none';
+    } else {
+        centerPattern = centerPatterns[Math.floor(Math.random() * centerPatterns.length)];
+    }
 
     const flower = {
         name: `${getTypeName(flowerType)} ${Math.floor(rand(1, 999))}`,

@@ -19,6 +19,9 @@ let recentColors = {
 // Queue of recently generated flowers to ensure neighbor diversity
 let recentFlowersQueue = [];
 
+// Counter for tracking generation order
+let generationCounter = 0;
+
 // Maximum number of recent colors to track for diversity
 const MAX_RECENT_COLORS = 10;
 
@@ -735,16 +738,7 @@ function generateRandomFlower() {
     const fractalDepth = Math.floor(rand(0, 3));
     const tilt3D = 0; // Удаляем 3D наклон, устанавливаем в 0
     
-    // Define available center patterns including our new ones
-    const centerPatterns = ['none', 'triangles', 'squares', 'pentagons', 'diamonds', 'cells', 'stars'];
-    const centerPattern = centerPatterns[Math.floor(Math.random() * centerPatterns.length)];
-    
-    // Randomly determine if this flower should have outlines on some petals (60% chance)
-    const hasOutlines = Math.random() < 0.6;
-    // Randomly determine if this flower should have center tessellation (70% chance)
-    const hasTessellation = Math.random() < 0.7;
-    
-    // Generate enhanced colors for more vibrant and insect-attractive flowers
+    // Генерация цветов
     let colors;
     let attempts = 0;
     const maxAttempts = 5;
@@ -773,13 +767,19 @@ function generateRandomFlower() {
     // Try to generate a color palette that passes diversity checks
     do {
         if (selectedMethod === 'harmonious') {
-            colors = generateHarmoniousColorsFromPalette();
-        } else {
-            colors = generateEnhancedColors({ method: selectedMethod });
+            colors = generateHarmoniousColors();
+        } else if (selectedMethod === 'bee-friendly') {
+            colors = generateBeeAttractiveColors();
+        } else if (selectedMethod === 'butterfly-friendly') {
+            colors = generateButterflyAttractiveColors();
+        } else if (selectedMethod === 'aggressive') {
+            colors = generateAggressiveColors();
+        } else if (selectedMethod === 'insect-attractive') {
+            colors = generateInsectAttractiveColors();
         }
         attempts++;
     } while (attempts < maxAttempts && !passesDiversityCheck(colors));
-    
+
     const petalColor = colors.primary;
     const petalColor2 = colors.secondary;
     const centerColor = colors.accent;
@@ -798,7 +798,22 @@ function generateRandomFlower() {
     
     const antherSize = hasStamens ? parseFloat(rand(0.7, 1.5).toFixed(1)) : 1.0;
 
-    // Create the flower object with realistic color harmonies
+    // Define available center patterns including our new ones
+    const centerPatterns = ['none', 'triangles', 'squares', 'pentagons', 'diamonds', 'cells', 'stars'];
+    let centerPattern;
+    
+    // For insectoid type, always use 'none' pattern (no tessellation)
+    if (flowerType === 'insectoid') {
+        centerPattern = 'none';
+    } else {
+        centerPattern = centerPatterns[Math.floor(Math.random() * centerPatterns.length)];
+    }
+
+    // Randomly determine if this flower should have outlines on some petals (60% chance)
+    const hasOutlines = Math.random() < 0.6;
+    // Randomly determine if this flower should have center tessellation (70% chance)
+    const hasTessellation = Math.random() < 0.7;
+
     const flower = {
         type: flowerType,
         radius,
@@ -827,7 +842,8 @@ function generateRandomFlower() {
         hasStamens,
         centerPattern,      // Add the center pattern property
         hasTessellation,    // Add the tessellation flag
-        hasOutlines         // Add the outlines flag
+        hasOutlines,        // Add the outlines flag
+        generationNumber: ++generationCounter  // Add the generation number
     };
 
     return flower;
@@ -844,6 +860,13 @@ function generateRandomFlowerBatch(count) {
         // Add to recent flowers queue to ensure neighbor diversity
         addToRecentFlowers(flower);
     }
+    
+    // Automatically log flower info if we've generated 50 flowers
+    if (count === 50) {
+        setTimeout(() => {
+            logGeneratedFlowers();
+        }, 100); // Delay to ensure all flowers are processed
+    }
 }
 
 /**
@@ -855,10 +878,55 @@ function getAllFlowersWithGenerated() {
 }
 
 /**
+ * Log all generated flowers with their tessellation patterns and palettes to console
+ */
+function logGeneratedFlowers() {
+    const allFlowers = getAllFlowersWithGenerated();
+    
+    console.log(`%c=== Сгенерированные цветы (${allFlowers.length} шт.) ===`, 'color: #4CAF50; font-weight: bold; font-size: 16px;');
+    
+    allFlowers.forEach((flower, index) => {
+        const patternNames = {
+            'none': 'Без замощения',
+            'triangles': 'Треугольники',
+            'squares': 'Квадраты',
+            'pentagons': 'Пятиугольники',
+            'diamonds': 'Ромбы',
+            'cells': 'Клетки',
+            'stars': 'Звезды'
+        };
+        
+        const patternName = patternNames[flower.centerPattern] || flower.centerPattern;
+        const flowerTypeName = flower.type;
+        const paletteInfo = {
+            'Цвет лепестков 1': flower.petalColor,
+            'Цвет лепестков 2': flower.petalColor2,
+            'Цвет центра 1': flower.centerColor,
+            'Цвет центра 2': flower.centerColor2,
+            'Цвет стебля': flower.stemColor,
+            'Цвет листьев': flower.leafColor,
+            'Цвет тычинок': flower.stamenColor
+        };
+        
+        console.log(`\n%cЦветок #${flower.generationNumber} (Порядковый: ${index + 1})`, 'color: #2196F3; font-weight: bold;');
+        console.log(`%c  Тип: ${flowerTypeName}`, 'color: #666;');
+        console.log(`%c  Замощение: ${patternName}`, 'color: #666;');
+        console.log(`%c  Радиус: ${flower.radius}, Лепестков: ${flower.petals}`, 'color: #666;');
+        console.log('%c  Палитра:', 'color: #666;');
+        for (const [colorName, colorValue] of Object.entries(paletteInfo)) {
+            console.log(`%c    ${colorName}: ${colorValue}`, 'color: #666;');
+        }
+    });
+    
+    console.log(`\n%c=== Всего: ${allFlowers.length} цветов ===`, 'color: #4CAF50; font-weight: bold;');
+}
+
+/**
  * Reset generated flowers pool and color tracking
  */
 function resetGeneratedFlowers() {
     generatedFlowers = [];
+    generationCounter = 0; // Reset the generation counter as well
     // Reset the recent colors tracking to allow full color diversity again
     recentColors = {
         primary: [],
@@ -898,6 +966,7 @@ if (typeof window !== 'undefined') {
     window.generateRandomFlowerBatch = generateRandomFlowerBatch;
     window.getAllFlowersWithGenerated = getAllFlowersWithGenerated;
     window.resetGeneratedFlowers = resetGeneratedFlowers;
+    window.logGeneratedFlowers = logGeneratedFlowers; // Add the logging function to global scope
     window.colorPalettes = colorPalettes;
     window.calculateColorHarmony = calculateColorHarmony;
     window.evaluatePaletteHarmony = evaluatePaletteHarmony;
@@ -911,5 +980,6 @@ export {
     generateRandomFlower,
     generateRandomFlowerBatch,
     getAllFlowersWithGenerated,
-    resetGeneratedFlowers
+    resetGeneratedFlowers,
+    logGeneratedFlowers  // Export the logging function
 };

@@ -9,6 +9,9 @@ let colorPalettes = [];
 // Отслеживание использованных индексов палитр для обеспечения уникальности
 let usedPaletteIndices = new Set();
 
+// Отслеживание уникальных палитр по хешу для предотвращения повторений
+let usedPaletteHashes = new Set();
+
 // Хранение недавно использованных цветов для обеспечения разнообразия
 let recentColors = {
     primary: [],
@@ -185,6 +188,43 @@ function hslToHex(h, s, l) {
 }
 
 /**
+ * Создание хеша палитры на основе цветов
+ * @param {object} colors - Объект с цветами палитры
+ * @returns {string} Хеш палитры
+ */
+function createPaletteHash(colors) {
+    // Создаем строку на основе всех цветов в палитре
+    const colorString = `${colors.primary}-${colors.secondary}-${colors.accent}-${colors.accentDark}-${colors.stem}-${colors.leaf}-${colors.stamen}`;
+    // Простой алгоритм хеширования
+    let hash = 0;
+    for (let i = 0; i < colorString.length; i++) {
+        const char = colorString.charCodeAt(i);
+        hash = ((hash << 5) - hash) + char;
+        hash |= 0; // Преобразование в 32-битное целое число
+    }
+    return hash.toString();
+}
+
+/**
+ * Проверка, использовалась ли уже палитра
+ * @param {object} colors - Объект с цветами палитры
+ * @returns {boolean} true если палитра уже использовалась
+ */
+function isPaletteAlreadyUsed(colors) {
+    const hash = createPaletteHash(colors);
+    return usedPaletteHashes.has(hash);
+}
+
+/**
+ * Пометка палитры как использованной
+ * @param {object} colors - Объект с цветами палитры
+ */
+function markPaletteAsUsed(colors) {
+    const hash = createPaletteHash(colors);
+    usedPaletteHashes.add(hash);
+}
+
+/**
  * Генерация гармоничной палитры из 1000.json с обеспечением уникальности
  * @returns {object} Объект с цветами палитры
  */
@@ -194,56 +234,68 @@ function getUniquePaletteFromJson() {
         return generateHarmoniousColorsFallback();
     }
     
-    // Получить индекс неиспользованной палитры для обеспечения уникальности
-    const paletteIndex = getUnusedPaletteIndex();
-    if (paletteIndex === null) {
-        // Если все палитры использованы, использовать резервную генерацию
-        return generateHarmoniousColorsFallback();
-    }
+    let attempts = 0;
+    const maxAttempts = 50; // Ограничиваем количество попыток
     
-    // Получить палитру по выбранному индексу
-    const palette = [...colorPalettes[paletteIndex]];
-    
-    // Убедиться, что у нас есть как минимум 7 цветов
-    while (palette.length < 7) {
-        palette.push(palette[Math.floor(Math.random() * palette.length)]);
-    }
-    
-    // Назначить цвета различным элементам цветка
-    const colors = {
-        primary: palette[0],
-        secondary: palette[1],
-        accent: palette[2],
-        accentDark: palette[3],
-        stem: palette[4],
-        leaf: palette[5],
-        stamen: palette[6]
-    };
-    
-    // Проверить, не слишком ли похожи эти цвета на недавно использованные
-    if (
-        !isColorTooSimilar(colors.primary, recentColors.primary) &&
-        !isColorTooSimilar(colors.secondary, recentColors.secondary) &&
-        !isColorTooSimilar(colors.accent, recentColors.accent) &&
-        !isColorTooSimilar(colors.accentDark, recentColors.accentDark) &&
-        !isColorTooSimilar(colors.stem, recentColors.stem) &&
-        !isColorTooSimilar(colors.leaf, recentColors.leaf) &&
-        !isColorTooSimilar(colors.stamen, recentColors.stamen)
-    ) {
-        // Добавить цвета в список недавно использованных
-        addToRecentColors('primary', colors.primary);
-        addToRecentColors('secondary', colors.secondary);
-        addToRecentColors('accent', colors.accent);
-        addToRecentColors('accentDark', colors.accentDark);
-        addToRecentColors('stem', colors.stem);
-        addToRecentColors('leaf', colors.leaf);
-        addToRecentColors('stamen', colors.stamen);
+    while (attempts < maxAttempts) {
+        // Получить индекс неиспользованной палитры для обеспечения уникальности
+        const paletteIndex = getUnusedPaletteIndex();
+        if (paletteIndex === null) {
+            // Если все палитры использованы, использовать резервную генерацию
+            return generateHarmoniousColorsFallback();
+        }
         
-        return colors;
+        // Получить палитру по выбранному индексу
+        const palette = [...colorPalettes[paletteIndex]];
+        
+        // Убедиться, что у нас есть как минимум 7 цветов
+        while (palette.length < 7) {
+            palette.push(palette[Math.floor(Math.random() * palette.length)]);
+        }
+        
+        // Назначить цвета различным элементам цветка
+        const colors = {
+            primary: palette[0],
+            secondary: palette[1],
+            accent: palette[2],
+            accentDark: palette[3],
+            stem: palette[4],
+            leaf: palette[5],
+            stamen: palette[6]
+        };
+        
+        // Проверить, не слишком ли похожи эти цвета на недавно использованные
+        if (
+            !isColorTooSimilar(colors.primary, recentColors.primary) &&
+            !isColorTooSimilar(colors.secondary, recentColors.secondary) &&
+            !isColorTooSimilar(colors.accent, recentColors.accent) &&
+            !isColorTooSimilar(colors.accentDark, recentColors.accentDark) &&
+            !isColorTooSimilar(colors.stem, recentColors.stem) &&
+            !isColorTooSimilar(colors.leaf, recentColors.leaf) &&
+            !isColorTooSimilar(colors.stamen, recentColors.stamen)
+        ) {
+            // Дополнительно проверить, не использовалась ли уже такая комбинация цветов
+            if (!isPaletteAlreadyUsed(colors)) {
+                // Добавить цвета в список недавно использованных
+                addToRecentColors('primary', colors.primary);
+                addToRecentColors('secondary', colors.secondary);
+                addToRecentColors('accent', colors.accent);
+                addToRecentColors('accentDark', colors.accentDark);
+                addToRecentColors('stem', colors.stem);
+                addToRecentColors('leaf', colors.leaf);
+                addToRecentColors('stamen', colors.stamen);
+                
+                // Отметить палитру как использованную
+                markPaletteAsUsed(colors);
+                
+                return colors;
+            }
+        }
+        // Если палитра уже использовалась или цвета слишком похожи, увеличиваем счетчик попыток и продолжаем
+        attempts++;
     }
     
-    // Если цвета слишком похожи на недавние, удалить индекс из использованных и использовать резервную генерацию
-    usedPaletteIndices.delete(paletteIndex);
+    // Если не удалось найти уникальную палитру за отведенное число попыток, использовать резервную генерацию
     return generateHarmoniousColorsFallback();
 }
 

@@ -372,3 +372,9 @@ if (typeof window !== 'undefined') {
     window.generateHarmoniousColors = generateHarmoniousColors;
     window.colorPalettes = colorPalettes;
 }
+
+// Export functions for use in other modules
+export {
+    generateHarmoniousColors,
+    generateComplementaryColor
+};

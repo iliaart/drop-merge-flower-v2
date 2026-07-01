@@ -1,6 +1,10 @@
 // Random Flower Colors Module for the game
 import { hslToHex } from './utils-wrapper.mjs';
 
+// Define recursion tracking keys outside functions to persist between calls
+const PASSES_DIVERSITY_CHECK_RECURSION_KEY = Symbol('passesDiversityCheckRecursionDepth');
+const IS_COLOR_TOO_SIMILAR_RECURSION_KEY = Symbol('isColorTooSimilarRecursionDepth');
+
 // Track recently used colors to ensure diversity
 let recentColors = {
     primary: [],
@@ -19,29 +23,38 @@ const MAX_RECENT_COLORS = 10;
  * Check if a color is too similar to recently used colors
  */
 function isColorTooSimilar(newColor, recentColorsList) {
-    // Add recursion depth protection
-    if (isColorTooSimilar.callCount === undefined) {
-        isColorTooSimilar.callCount = 0;
-    }
+    // Use the pre-defined recursion tracking constant
+    isColorTooSimilar[IS_COLOR_TOO_SIMILAR_RECURSION_KEY] = 
+      (isColorTooSimilar[IS_COLOR_TOO_SIMILAR_RECURSION_KEY] || 0) + 1;
+
+    // Define the recursion key
+    const PASSES_DIVERSITY_CHECK_RECURSION_KEY = 'passesDiversityCheckRecursionDepth';
     
-    isColorTooSimilar.callCount++;
-    if (isColorTooSimilar.callCount > 100) { // Prevent stack overflow
+    // Initialize recursion tracking if not present
+    if (!passesDiversityCheck[PASSES_DIVERSITY_CHECK_RECURSION_KEY]) {
+        passesDiversityCheck[PASSES_DIVERSITY_CHECK_RECURSION_KEY] = 0;
+    }
+    // Use the pre-defined recursion tracking constant
+    passesDiversityCheck[PASSES_DIVERSITY_CHECK_RECURSION_KEY] = 
+      (passesDiversityCheck[PASSES_DIVERSITY_CHECK_RECURSION_KEY] || 0) + 1;
+    if (isColorTooSimilar[IS_COLOR_TOO_SIMILAR_RECURSION_KEY] > 100) { // Prevent stack overflow
         console.error('Recursion depth exceeded in isColorTooSimilar');
-        isColorTooSimilar.callCount = 0;
+        isColorTooSimilar[IS_COLOR_TOO_SIMILAR_RECURSION_KEY] = 0;
         return false; // Return safe value to prevent infinite loop
     }
     
-    // Use centralized function if available
-    if (typeof window.isColorTooSimilar === 'function' && isColorTooSimilar.callCount <= 1) {
+    // Use centralized function if available, but avoid potential circular calls
+    if (typeof window.isColorTooSimilar === 'function' && 
+        isColorTooSimilar[IS_COLOR_TOO_SIMILAR_RECURSION_KEY] <= 2) { // Reduced from 1 to allow 1 level of recursion
         // This function expects the centralized version which compares one color against a list
         const result = window.isColorTooSimilar(newColor, recentColorsList);
-        isColorTooSimilar.callCount--; // Decrement counter when returning
+        isColorTooSimilar[IS_COLOR_TOO_SIMILAR_RECURSION_KEY]--; // Decrement counter when returning
         return result;
     }
     
     // Fallback local implementation
     if (recentColorsList.length === 0) {
-        isColorTooSimilar.callCount--; // Decrement counter when returning
+        isColorTooSimilar[IS_COLOR_TOO_SIMILAR_RECURSION_KEY]--; // Decrement counter when returning
         return false;
     }
     
@@ -66,12 +79,12 @@ function isColorTooSimilar(newColor, recentColorsList) {
         
         // If distance is small, colors are too similar
         if (distance < 40) { // Reduced threshold for better variety
-            isColorTooSimilar.callCount--; // Decrement counter when returning
+            isColorTooSimilar[IS_COLOR_TOO_SIMILAR_RECURSION_KEY]--; // Decrement counter when returning
             return true;
         }
     }
     
-    isColorTooSimilar.callCount--; // Decrement counter when returning
+    isColorTooSimilar[IS_COLOR_TOO_SIMILAR_RECURSION_KEY]--; // Decrement counter when returning
     return false;
 }
 
@@ -189,53 +202,6 @@ function evaluatePaletteHarmony(colors) {
  * Check if colors pass diversity requirements
  */
 function passesDiversityCheck(colors) {
-    // Add recursion depth protection
-    if (passesDiversityCheck.callCount === undefined) {
-        passesDiversityCheck.callCount = 0;
-    }
-    
-    passesDiversityCheck.callCount++;
-    if (passesDiversityCheck.callCount > 100) { // Prevent stack overflow
-        console.error('Recursion depth exceeded in passesDiversityCheck');
-        passesDiversityCheck.callCount = 0;
-        return true; // Allow the color to prevent infinite loop
-    }
-    
-    // Use centralized function if available
-    if (typeof window.passesDiversityCheck === 'function') {
-        const result = window.passesDiversityCheck(colors);
-        passesDiversityCheck.callCount--; // Decrement counter when returning
-        return result;
-    }
-    
-    // Fallback local implementation
-    // Check if any two colors are too similar
-    const colorKeys = ['primary', 'secondary', 'accent', 'accentDark', 'stem', 'leaf', 'stamen'];
-    for (let i = 0; i < colorKeys.length; i++) {
-        for (let j = i + 1; j < colorKeys.length; j++) {
-            if (isColorTooSimilar(colors[colorKeys[i]], [colors[colorKeys[j]]])) {
-                passesDiversityCheck.callCount--; // Decrement counter when returning
-                return false;
-            }
-        }
-    }
-    
-    passesDiversityCheck.callCount--; // Decrement counter when returning
-    return true;
-}
-
-/**
- * Generate enhanced colors with extra diversity
- */
-function generateEnhancedColors() {
-    // Use centralized function if available
-    if (typeof window.getUniquePaletteFromJson === 'function') {
-        try {
-            return window.getUniquePaletteFromJson();
-        } catch (e) {
-            console.warn('Centralized palette manager failed, falling back to local algorithm:', e);
-        }
-    }
     
     // Fallback local implementation
     return generateRandomColors();
@@ -438,6 +404,23 @@ function generateInsectAttractiveColors() {
     addToRecentColors('stamen', colors.stamen);
     
     return colors;
+}
+
+/**
+ * Generate enhanced colors with extra diversity
+ */
+function generateEnhancedColors() {
+    // Use centralized function if available
+    if (typeof window.getUniquePaletteFromJson === 'function') {
+        try {
+            return window.getUniquePaletteFromJson();
+        } catch (e) {
+            console.warn('Centralized palette manager failed, falling back to local algorithm:', e);
+        }
+    }
+    
+    // Fallback local implementation
+    return generateRandomColors();
 }
 
 // Export functions

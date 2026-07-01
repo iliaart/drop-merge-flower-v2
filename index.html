@@ -73,7 +73,7 @@
     <script src="js/flower-gen-types.js"></script>
     <script src="js/flower-gen-types-advanced.js"></script>
     <script src="js/flower-gen-types-bio-inspired.js"></script>
-    <script type="module">
+    <script>
         // Wait for all functions to be loaded and then extend the flower drawer
         setTimeout(function() {
             if (typeof extendFlowerDrawer === 'function') {
@@ -83,7 +83,8 @@
                 console.error("extendFlowerDrawer function not found");
             }
         }, 100);
-
+    </script>
+    <script type="module">
         import { initGame, restart, setupInput } from './js/game.js';
         import { getAllFlowersWithGenerated } from './js/random-flowers.js';
         import { CONFIG } from './js/config.js';
@@ -122,17 +123,13 @@
             // Clear any existing generated flowers and generate new ones
             resetGeneratedFlowers();
             
-            // First generate base flowers without diversity
-            generateRandomFlowerBatch(30); // Base flowers
+            // Initialize unique palettes from 1000.json ensuring no repeated petal or center colors
+            if (typeof window.initializeUniquePalettes === 'function') {
+                await window.initializeUniquePalettes();
+            }
             
-            // Then add diversity flowers
-            window.COLOR_DIVERSITY = {
-                enabled: true,
-                baseHue: 120, // green base
-                variationRange: 60 // 90-150 degrees
-            };
-            
-            generateRandomFlowerBatch(20); // Diversity flowers
+            // Generate 50 flowers with unique palettes ensuring petal colors and center colors don't repeat
+            generateRandomFlowerBatch(50); 
             
             // Update MAX_LEVEL to reflect only generated flowers
             CONFIG.MAX_LEVEL = getAllFlowersWithGenerated().length - 1;

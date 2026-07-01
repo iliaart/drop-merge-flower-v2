@@ -1,5 +1,10 @@
-// Utility functions for flower generator
-const TAU = Math.PI * 2;
+// ESM wrapper module to export utility functions
+// This is a dedicated module that provides ESM exports for utility functions
+
+/**
+ * Constant for 2π (tau)
+ */
+export const TAU = Math.PI * 2;
 
 /**
  * Clamp a value between min and max
@@ -8,7 +13,7 @@ const TAU = Math.PI * 2;
  * @param {number} max
  * @returns {number}
  */
-function clamp(val, min, max) {
+export function clamp(val, min, max) {
     return Math.max(min, Math.min(max, val));
 }
 
@@ -18,7 +23,7 @@ function clamp(val, min, max) {
  * @param {number} max
  * @returns {number}
  */
-function rand(min, max) {
+export function rand(min, max) {
     return Math.random() * (max - min) + min;
 }
 
@@ -28,7 +33,7 @@ function rand(min, max) {
  * @param {number} alpha - opacity 0-1
  * @returns {string} rgba color string
  */
-function rgba(color, alpha) {
+export function rgba(color, alpha) {
     if (!color || typeof color !== 'string') {
         return `rgba(128,128,128,${alpha})`;
     }
@@ -51,7 +56,7 @@ function rgba(color, alpha) {
  * @param {number} amount - 0-1 lightening factor
  * @returns {string} rgb color string
  */
-function lighten(color, amount) {
+export function lighten(color, amount) {
     if (!color || typeof color !== 'string') {
         return '#808080';
     }
@@ -80,7 +85,7 @@ function lighten(color, amount) {
  * @param {number} amount - 0-1 darkening factor
  * @returns {string} rgb color string
  */
-function darken(color, amount) {
+export function darken(color, amount) {
     if (!color || typeof color !== 'string') {
         return '#808080';
     }
@@ -109,7 +114,7 @@ function darken(color, amount) {
  * @param {number} y
  * @returns {number}
  */
-function simplexNoise(x, y) {
+export function simplexNoise(x, y) {
     return (Math.sin(x * 12.9898 + y * 78.233) * 43758.5453) % 1;
 }
 
@@ -120,7 +125,7 @@ function simplexNoise(x, y) {
  * @param {number} l - lightness 0-100
  * @returns {string} hex color
  */
-function hslToHex(h, s, l) {
+export function hslToHex(h, s, l) {
     h = ((h % 360) + 360) % 360;
     s /= 100; l /= 100;
     const a = s * Math.min(l, 1 - l);
@@ -139,7 +144,7 @@ function hslToHex(h, s, l) {
  * @param {number} b - blue 0-255
  * @returns {Array} [h, s, l] where h is 0-360, s and l are 0-100
  */
-function rgbToHsl(r, g, b) {
+export function rgbToHsl(r, g, b) {
     r /= 255; g /= 255; b /= 255;
     const max = Math.max(r, g, b), min = Math.min(r, g, b);
     let h, s, l = (max + min) / 2;
@@ -161,7 +166,7 @@ function rgbToHsl(r, g, b) {
  * Initialize 50 unique palettes for flower generation
  * @returns {Array} Array of 50 unique palette objects
  */
-function initializeUniquePalettes() {
+export function initializeUniquePalettes() {
     const palettes = [];
     
     // Generate 50 unique color combinations
@@ -200,32 +205,4 @@ function initializeUniquePalettes() {
     
     console.log(`Successfully generated ${palettes.length} unique palettes for flower generation`);
     return palettes;
-}
-
-// Make functions available globally
-window.TAU = TAU;
-window.clamp = clamp;
-window.rand = rand;
-window.rgba = rgba;
-window.lighten = lighten;
-window.darken = darken;
-window.simplexNoise = simplexNoise;
-window.hslToHex = hslToHex;
-window.rgbToHsl = rgbToHsl;
-window.initializeUniquePalettes = initializeUniquePalettes;
-
-// For CommonJS environments (Node.js)
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = {
-        TAU,
-        clamp,
-        rand,
-        rgba,
-        lighten,
-        darken,
-        simplexNoise,
-        hslToHex,
-        rgbToHsl,
-        initializeUniquePalettes
-    };
 }

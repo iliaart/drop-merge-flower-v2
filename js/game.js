@@ -16,7 +16,7 @@ const { GW, GH, VASE, DANGER_Y, DROP_Y, MAX_LEVEL, GAME_OVER_GRACE, MERGE_RADIUS
 const GAME_OVER_FLOWER_THRESHOLD = 3; // need this many flowers out of bounds to lose
 
 /** Initialize game with canvas, context, restart button, and Matter.js */
-export function initGame(canvasEl, ctxEl, restartBtnEl, MatterLib) {
+export async function initGame(canvasEl, ctxEl, restartBtnEl, MatterLib) {
     state.canvas = canvasEl;
     state.ctx = ctxEl;
     state.restartBtn = restartBtnEl;
@@ -28,6 +28,11 @@ export function initGame(canvasEl, ctxEl, restartBtnEl, MatterLib) {
     state.shake = new ScreenShake();
 
     for (let i = 0; i < 15; i++) state.ambientMotes.push(new AmbientMote());
+
+    // Initialize unique palettes before generating flowers
+    if (typeof window.initializeUniquePalettes === 'function') {
+        await window.initializeUniquePalettes();
+    }
 
     // Generate random flowers for the game session
     resetGeneratedFlowers();

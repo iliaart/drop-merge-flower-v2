@@ -23,6 +23,10 @@ let recentColors = {
     stamen: []
 };
 
+// Множества для отслеживания уникальности цветов по компонентам
+let usedPetalColors = new Set(); // Для отслеживания цветов лепестков (primary и secondary)
+let usedCenterColors = new Set(); // Для отслеживания цветов центра (accent и accentDark)
+
 // Максимальное количество недавно использованных цветов для отслеживания
 const MAX_RECENT_COLORS = 10;
 
@@ -64,6 +68,44 @@ async function loadPalettes() {
  */
 function resetUsedPalettes() {
     usedPaletteIndices = new Set();
+    usedPetalColors = new Set(); // Сброс отслеживания цветов лепестков
+    usedCenterColors = new Set(); // Сброс отслеживания цветов центра
+}
+
+/**
+ * Сброс отслеживания использованных цветов по компонентам
+ */
+function resetUsedComponentColors() {
+    usedPetalColors = new Set();
+    usedCenterColors = new Set();
+}
+
+/**
+ * Проверка, используется ли цвет для компонента
+ * @param {string} color - Цвет в формате HEX
+ * @param {string} component - Компонент ('primary', 'secondary', 'accent', 'accentDark', 'stem', 'leaf', 'stamen')
+ * @returns {boolean} true если цвет уже используется для этого компонента
+ */
+function isComponentColorUsed(color, component) {
+    if (['primary', 'secondary'].includes(component)) {
+        return usedPetalColors.has(color.toLowerCase());
+    } else if (['accent', 'accentDark'].includes(component)) {
+        return usedCenterColors.has(color.toLowerCase());
+    }
+    return false;
+}
+
+/**
+ * Пометка цвета компонента как использованного
+ * @param {string} color - Цвет в формате HEX
+ * @param {string} component - Компонент ('primary', 'secondary', 'accent', 'accentDark', 'stem', 'leaf', 'stamen')
+ */
+function markComponentColorAsUsed(color, component) {
+    if (['primary', 'secondary'].includes(component)) {
+        usedPetalColors.add(color.toLowerCase());
+    } else if (['accent', 'accentDark'].includes(component)) {
+        usedCenterColors.add(color.toLowerCase());
+    }
 }
 
 /**
@@ -264,6 +306,17 @@ function getUniquePaletteFromJson() {
             stamen: palette[6]
         };
         
+        // Проверить, не используются ли уже цвета для соответствующих компонентов
+        if (
+            usedPetalColors.has(colors.primary.toLowerCase()) ||
+            usedPetalColors.has(colors.secondary.toLowerCase()) ||
+            usedCenterColors.has(colors.accent.toLowerCase()) ||
+            usedCenterColors.has(colors.accentDark.toLowerCase())
+        ) {
+            attempts++;
+            continue; // Попробовать другую палитру
+        }
+        
         // Проверить, не слишком ли похожи эти цвета на недавно использованные
         if (
             !isColorTooSimilar(colors.primary, recentColors.primary) &&
@@ -276,19 +329,36 @@ function getUniquePaletteFromJson() {
         ) {
             // Дополнительно проверить, не использовалась ли уже такая комбинация цветов
             if (!isPaletteAlreadyUsed(colors)) {
-                // Добавить цвета в список недавно использованных
-                addToRecentColors('primary', colors.primary);
-                addToRecentColors('secondary', colors.secondary);
-                addToRecentColors('accent', colors.accent);
-                addToRecentColors('accentDark', colors.accentDark);
-                addToRecentColors('stem', colors.stem);
-                addToRecentColors('leaf', colors.leaf);
-                addToRecentColors('stamen', colors.stamen);
-                
-                // Отметить палитру как использованную
-                markPaletteAsUsed(colors);
-                
-                return colors;
+                // Проверить уникальность компонентов
+                if (
+                    !isComponentColorUsed(colors.primary, 'primary') &&
+                    !isComponentColorUsed(colors.secondary, 'secondary') &&
+                    !isComponentColorUsed(colors.accent, 'accent') &&
+                    !isComponentColorUsed(colors.accentDark, 'accentDark')
+                ) {
+                    // Добавить цвета в список недавно использованных
+                    addToRecentColors('primary', colors.primary);
+                    addToRecentColors('secondary', colors.secondary);
+                    addToRecentColors('accent', colors.accent);
+                    addToRecentColors('accentDark', colors.accentDark);
+                    addToRecentColors('stem', colors.stem);
+                    addToRecentColors('leaf', colors.leaf);
+                    addToRecentColors('stamen', colors.stamen);
+                    
+                    // Отметить цвета компонентов как использованные
+                    markComponentColorAsUsed(colors.primary, 'primary');
+                    markComponentColorAsUsed(colors.secondary, 'secondary');
+                    markComponentColorAsUsed(colors.accent, 'accent');
+                    markComponentColorAsUsed(colors.accentDark, 'accentDark');
+                    markComponentColorAsUsed(colors.stem, 'stem');
+                    markComponentColorAsUsed(colors.leaf, 'leaf');
+                    markComponentColorAsUsed(colors.stamen, 'stamen');
+                    
+                    // Отметить палитру как использованную
+                    markPaletteAsUsed(colors);
+                    
+                    return colors;
+                }
             }
         }
         // Если палитра уже использовалась или цвета слишком похожи, увеличиваем счетчик попыток и продолжаем
@@ -321,6 +391,17 @@ function generateHarmoniousColorsFallback() {
         const leaf = hslToHex(100, 45 + Math.random() * 20, 30 + Math.random() * 15); // Зеленые тона для листьев
         const stamen = hslToHex((baseHue + 150) % 360, 80 + Math.random() * 15, 60 + Math.random() * 20); // Контрастный тычинки
         
+        // Проверить, не используются ли уже цвета для соответствующих компонентов
+        if (
+            usedPetalColors.has(primary.toLowerCase()) ||
+            usedPetalColors.has(secondary.toLowerCase()) ||
+            usedCenterColors.has(accent.toLowerCase()) ||
+            usedCenterColors.has(accentDark.toLowerCase())
+        ) {
+            attempts++;
+            continue; // Попробовать другие цвета
+        }
+        
         // Проверить, не слишком ли похожи эти цвета на недавно использованные
         if (
             !isColorTooSimilar(primary, recentColors.primary) &&
@@ -331,25 +412,42 @@ function generateHarmoniousColorsFallback() {
             !isColorTooSimilar(leaf, recentColors.leaf) &&
             !isColorTooSimilar(stamen, recentColors.stamen)
         ) {
-            // Добавить цвета в список недавно использованных
-            addToRecentColors('primary', primary);
-            addToRecentColors('secondary', secondary);
-            addToRecentColors('accent', accent);
-            addToRecentColors('accentDark', accentDark);
-            addToRecentColors('stem', stem);
-            addToRecentColors('leaf', leaf);
-            addToRecentColors('stamen', stamen);
-            
-            return {
-                primary,
-                secondary,
-                accent,
-                accentDark,
-                stem,
-                leaf,
-                stamen,
-                scheme: 'harmonious-theory'
-            };
+            // Проверить уникальность компонентов
+            if (
+                !isComponentColorUsed(primary, 'primary') &&
+                !isComponentColorUsed(secondary, 'secondary') &&
+                !isComponentColorUsed(accent, 'accent') &&
+                !isComponentColorUsed(accentDark, 'accentDark')
+            ) {
+                // Добавить цвета в список недавно использованных
+                addToRecentColors('primary', primary);
+                addToRecentColors('secondary', secondary);
+                addToRecentColors('accent', accent);
+                addToRecentColors('accentDark', accentDark);
+                addToRecentColors('stem', stem);
+                addToRecentColors('leaf', leaf);
+                addToRecentColors('stamen', stamen);
+                
+                // Отметить цвета компонентов как использованные
+                markComponentColorAsUsed(primary, 'primary');
+                markComponentColorAsUsed(secondary, 'secondary');
+                markComponentColorAsUsed(accent, 'accent');
+                markComponentColorAsUsed(accentDark, 'accentDark');
+                markComponentColorAsUsed(stem, 'stem');
+                markComponentColorAsUsed(leaf, 'leaf');
+                markComponentColorAsUsed(stamen, 'stamen');
+                
+                return {
+                    primary,
+                    secondary,
+                    accent,
+                    accentDark,
+                    stem,
+                    leaf,
+                    stamen,
+                    scheme: 'harmonious-theory'
+                };
+            }
         }
         
         attempts++;
@@ -364,29 +462,97 @@ function generateHarmoniousColorsFallback() {
  * @returns {object} Объект с цветами палитры
  */
 function generateRandomColors() {
-    const colors = {
-        primary: hslToHex(Math.random() * 360, 70 + Math.random() * 30, 40 + Math.random() * 30),
-        secondary: hslToHex(Math.random() * 360, 60 + Math.random() * 35, 45 + Math.random() * 25),
-        accent: hslToHex(Math.random() * 360, 65 + Math.random() * 30, 50 + Math.random() * 20),
-        accentDark: hslToHex(Math.random() * 360, 70 + Math.random() * 25, 30 + Math.random() * 20),
-        stem: hslToHex(120, 40 + Math.random() * 20, 25 + Math.random() * 15),
-        leaf: hslToHex(100, 45 + Math.random() * 20, 30 + Math.random() * 15),
-        stamen: hslToHex(Math.random() * 360, 80 + Math.random() * 15, 60 + Math.random() * 20)
-    };
+    // Генерация базового оттенка для цветка
+    const baseHue = Math.floor(Math.random() * 360);
+    
+    const primary = hslToHex(baseHue, 70 + Math.random() * 30, 40 + Math.random() * 30); // Основной цвет
+    const secondary = hslToHex((baseHue + 30) % 360, 60 + Math.random() * 35, 45 + Math.random() * 25); // Аналогичный
+    const accent = hslToHex((baseHue + 180) % 360, 65 + Math.random() * 30, 50 + Math.random() * 20); // Комплементарный
+    const accentDark = hslToHex((baseHue + 180) % 360, 70 + Math.random() * 25, 30 + Math.random() * 20); // Темнее комплементарный
+    const stem = hslToHex(120, 40 + Math.random() * 20, 25 + Math.random() * 15); // Зеленые тона для стебля
+    const leaf = hslToHex(100, 45 + Math.random() * 20, 30 + Math.random() * 15); // Зеленые тона для листьев
+    const stamen = hslToHex((baseHue + 150) % 360, 80 + Math.random() * 15, 60 + Math.random() * 20); // Контрастный тычинки
+    
+    // Проверить, не используются ли уже цвета для соответствующих компонентов
+    if (
+        usedPetalColors.has(primary.toLowerCase()) ||
+        usedPetalColors.has(secondary.toLowerCase()) ||
+        usedCenterColors.has(accent.toLowerCase()) ||
+        usedCenterColors.has(accentDark.toLowerCase())
+    ) {
+        // Если цвета уже используются, попробуем сгенерировать другие
+        return generateHarmoniousColorsFallback();
+    }
+
+    // Проверить уникальность компонентов
+    if (
+        isComponentColorUsed(primary, 'primary') ||
+        isComponentColorUsed(secondary, 'secondary') ||
+        isComponentColorUsed(accent, 'accent') ||
+        isComponentColorUsed(accentDark, 'accentDark')
+    ) {
+        // Если цвета уже используются, попробуем сгенерировать другие
+        return generateHarmoniousColorsFallback();
+    }
     
     // Добавить цвета в список недавно использованных
-    addToRecentColors('primary', colors.primary);
-    addToRecentColors('secondary', colors.secondary);
-    addToRecentColors('accent', colors.accent);
-    addToRecentColors('accentDark', colors.accentDark);
-    addToRecentColors('stem', colors.stem);
-    addToRecentColors('leaf', colors.leaf);
-    addToRecentColors('stamen', colors.stamen);
+    addToRecentColors('primary', primary);
+    addToRecentColors('secondary', secondary);
+    addToRecentColors('accent', accent);
+    addToRecentColors('accentDark', accentDark);
+    addToRecentColors('stem', stem);
+    addToRecentColors('leaf', leaf);
+    addToRecentColors('stamen', stamen);
+    
+    // Отметить цвета компонентов как использованные
+    markComponentColorAsUsed(primary, 'primary');
+    markComponentColorAsUsed(secondary, 'secondary');
+    markComponentColorAsUsed(accent, 'accent');
+    markComponentColorAsUsed(accentDark, 'accentDark');
+    markComponentColorAsUsed(stem, 'stem');
+    markComponentColorAsUsed(leaf, 'leaf');
+    markComponentColorAsUsed(stamen, 'stamen');
     
     return {
-        ...colors,
+        primary,
+        secondary,
+        accent,
+        accentDark,
+        stem,
+        leaf,
+        stamen,
         scheme: 'random'
     };
+}
+
+/**
+ * Создание 50 уникальных палитр из 1000.json с гарантией уникальности цветов лепестков и центра
+ * @returns {Array} Массив из 50 уникальных палитр
+ */
+function generate50UniquePalettes() {
+    const palettes = [];
+    const originalUsedPetalColors = new Set(usedPetalColors);
+    const originalUsedCenterColors = new Set(usedCenterColors);
+    
+    // Сброс отслеживания для создания 50 уникальных палитр
+    resetUsedComponentColors();
+    
+    for (let i = 0; i < 50; i++) {
+        const palette = getUniquePaletteFromJson();
+        if (palette) {
+            palettes.push(palette);
+        } else {
+            console.warn(`Не удалось сгенерировать ${i+1}-ю уникальную палитру`);
+            break;
+        }
+    }
+    
+    // Восстановить оригинальные множества использованных цветов
+    usedPetalColors = originalUsedPetalColors;
+    usedCenterColors = originalUsedCenterColors;
+    
+    console.log(`Создано ${palettes.length} уникальных палитр`);
+    return palettes;
 }
 
 /**
@@ -413,4 +579,15 @@ if (typeof window !== 'undefined') {
     window.loadPalettes = loadPalettes;
     window.resetUsedPalettes = resetUsedPalettes;
     window.resetColorHistory = resetColorHistory;
+    window.generate50UniquePalettes = generate50UniquePalettes;
+    window.isComponentColorUsed = isComponentColorUsed;
+    window.markComponentColorAsUsed = markComponentColorAsUsed;
+    window.resetUsedComponentColors = resetUsedComponentColors;
+    window.createPaletteHash = createPaletteHash;
+    window.isPaletteAlreadyUsed = isPaletteAlreadyUsed;
+    window.markPaletteAsUsed = markPaletteAsUsed;
+    window.isColorTooSimilar = isColorTooSimilar;
+    window.addToRecentColors = addToRecentColors;
+    window.generateHarmoniousColorsFallback = generateHarmoniousColorsFallback;
+    window.generateRandomColors = generateRandomColors;
 }

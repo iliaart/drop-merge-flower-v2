@@ -1,169 +1,44 @@
-// Import necessary functions from other modules
-import { rand, hslToHex } from './utils.js';
-import { generateHarmoniousColors } from './flower-gen-colors.js';
+// Random Flower Generation Module for the game
+import { rand } from './utils.js';
+import { getAllFlowers } from './flowers.js';
+import { 
+    isColorTooSimilar,
+    addToRecentColors,
+    generateRandomColors,
+    generateComplementaryColor,
+    calculateColorHarmony,
+    evaluatePaletteHarmony,
+    passesDiversityCheck,
+    generateEnhancedColors,
+    generateBeeAttractiveColors,
+    generateButterflyAttractiveColors,
+    generateAggressiveColors,
+    generateInsectAttractiveColors,
+    recentColors,
+    hslToHex
+} from './random-flower-colors.js';
+import {
+    isFlowerTooSimilarToNeighbors,
+    calculateFlowerColorSimilarity,
+    getColorDistance,
+    addToRecentFlowers,
+    recentFlowersQueue
+} from './random-flower-diversity.js';
 
-// Variables to track recently used colors and palettes
-const recentColors = {
-    primary: [],
-    secondary: [],
-    accent: [],
-    accentDark: [],
-    stem: [],
-    leaf: [],
-    stamen: []
-};
+// Store generated flowers during gameplay
+let generatedFlowers = [];
 
-const MAX_RECENT_COLORS = 5; // Track last 5 colors for each category
-
-// Function to add a color to the recent colors tracking
-function addToRecentColors(category, color) {
-    if (!recentColors[category]) {
-        recentColors[category] = [];
-    }
-    
-    // Add the new color to the front of the array
-    recentColors[category].unshift(color);
-    
-    // Keep only the most recent colors (up to MAX_RECENT_COLORS)
-    if (recentColors[category].length > MAX_RECENT_COLORS) {
-        recentColors[category].pop();
-    }
-}
-
-// Function to check if a color is too similar to recently used ones
-function isColorTooSimilar(newColor, recentColorList) {
-    if (!Array.isArray(recentColorList) || recentColorList.length === 0) {
-        return false; // No recent colors to compare with
-    }
-    
-    // Convert hex colors to HSL for better similarity detection
-    function hexToHSL(hex) {
-        // Remove the hash if present
-        hex = hex.replace(/^#/, '');
-        
-        // Parse r, g, b values
-        let r = parseInt(hex.substring(0, 2), 16) / 255;
-        let g = parseInt(hex.substring(2, 4), 16) / 255;
-        let b = parseInt(hex.substring(4, 6), 16) / 255;
-        
-        // Find the minimum and maximum values
-        let max = Math.max(r, g, b);
-        let min = Math.min(r, g, b);
-        let h, s, l = (max + min) / 2;
-        
-        if (max === min) {
-            h = s = 0; // achromatic
-        } else {
-            let d = max - min;
-            s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
-            
-            switch (max) {
-                case r: h = (g - b) / d + (g < b ? 6 : 0); break;
-                case g: h = (b - r) / d + 2; break;
-                case b: h = (r - g) / d + 4; break;
-            }
-            
-            h /= 6;
-        }
-        
-        return { h: h * 360, s: s * 100, l: l * 100 };
-    }
-    
-    const newHSL = hexToHSL(newColor);
-    
-    for (const recentColor of recentColorList) {
-        const recentHSL = hexToHSL(recentColor);
-        
-        // Check if the colors are too similar based on HSL values
-        const hueDiff = Math.min(
-            Math.abs(newHSL.h - recentHSL.h),
-            360 - Math.abs(newHSL.h - recentHSL.h)
-        );
-        const satDiff = Math.abs(newHSL.s - recentHSL.s);
-        const lumDiff = Math.abs(newHSL.l - recentHSL.l);
-        
-        // Adjust these thresholds as needed
-        if (hueDiff < 20 && satDiff < 20 && lumDiff < 20) {
-            return true; // Colors are too similar
-        }
-    }
-    
-    return false; // Colors are sufficiently different
-}
-
-// Variables to track generated flowers and related functions
+// Counter for tracking generation order
 let generationCounter = 0;
-const generatedFlowers = [];
 
-// Function to add to recent flowers queue to ensure neighbor diversity
-function addToRecentFlowers(flower) {
-    // This could implement logic to track recently generated flowers
-    // and ensure diversity in the game grid
-}
-
-// Function to reset generated flowers
-function resetGeneratedFlowers() {
-    generatedFlowers.length = 0; // Clear the array
-    generationCounter = 0; // Reset the counter
-    
-    // Also reset recent colors tracking
-    for (const category in recentColors) {
-        recentColors[category] = [];
-    }
-    
-    // Reset palette uniqueness tracking if it exists
-    if (window.resetUsedPalettes) {
-        window.resetUsedPalettes();
-    }
-}
-
-// Function to log all generated flowers with their properties
-function logGeneratedFlowers(allFlowers) {
-    // Проверяем, определен ли параметр allFlowers
-    if (!allFlowers) {
-        // Если allFlowers не передан, используем глобальный массив generatedFlowers
-        allFlowers = generatedFlowers;
-    }
-    
-    console.log(`%c=== Generated Flowers (${allFlowers.length} total) ===`, 'color: #4CAF50; font-weight: bold; font-size: 16px;');
-    
-    allFlowers.forEach((flower, index) => {
-        const patternNames = {
-            'none': 'No Tessellation',
-            'triangles': 'Triangles',
-            'squares': 'Squares',
-            'pentagons': 'Pentagons',
-            'diamonds': 'Diamonds',
-            'cells': 'Cells',
-            'stars': 'Stars'
-        };
-        
-        const patternName = patternNames[flower.centerPattern] || flower.centerPattern;
-        const flowerTypeName = flower.type;
-        const paletteInfo = {
-            'Primary Petal Color': flower.petalColor,
-            'Secondary Petal Color': flower.petalColor2,
-            'Center Accent Color': flower.centerColor,
-            'Center Dark Accent Color': flower.centerColor2,
-            'Stem Color': flower.stemColor,
-            'Leaf Color': flower.leafColor,
-            'Stamen Color': flower.stamenColor
-        };
-        
-        console.group(`%cFlower #${index + 1}: ${flowerTypeName} with ${patternName}`, 'color: #2196F3; font-weight: bold;');
-        console.table(paletteInfo);
-        console.groupEnd();
-    });
-    
-    console.log('%c=== End of Generated Flowers ===', 'color: #4CAF50; font-weight: bold; font-size: 16px;');
-}
+// Maximum number of recent colors to track for diversity
+const MAX_RECENT_COLORS = 10;
 
 /**
- * Generate bee-attractive colors with given variation
- * @param {number} variation - base hue variation
- * @returns {object} color palette
+ * Generate harmonious color palette based on color theory
+ * @returns {object} color palette with primary, secondary, accent, etc.
  */
-function generateBeeAttractiveColors(variation = 0) {
+function generateHarmoniousColors() {
     // Use centralized palette manager if available
     if (typeof window.getUniquePaletteFromJson === 'function') {
         try {
@@ -189,7 +64,7 @@ function generateBeeAttractiveColors(variation = 0) {
                 
                 return {
                     ...colors,
-                    scheme: 'bee-attractive'
+                    scheme: 'harmonious-from-json'
                 };
             } else {
                 // If colors are too similar to recent ones, fall back to algorithmic generation
@@ -205,22 +80,17 @@ function generateBeeAttractiveColors(variation = 0) {
     const maxAttempts = 10; // Limit attempts to avoid infinite loops
     
     while (attempts < maxAttempts) {
-        // Bees are particularly attracted to blue, purple, violet, and yellow
-        const baseHue = variation % 360;
-        const bluesAndPurples = [240, 270, 300]; // Blue to violet range
-        const yellows = [45, 60]; // Yellow range
+        // Генерация базового оттенка для цветка
+        const baseHue = Math.floor(Math.random() * 360);
         
-        const hue = Math.random() > 0.5 ? 
-            bluesAndPurples[Math.floor(Math.random() * bluesAndPurples.length)] : 
-            yellows[Math.floor(Math.random() * yellows.length)];
-        
-        const primary = hslToHex(hue, 85, 50);
-        const secondary = hslToHex((hue + 30) % 360, 75, 60);
-        const accent = hslToHex((hue + 150) % 360, 80, 45);
-        const accentDark = hslToHex((hue + 150) % 360, 85, 35);
-        const stem = hslToHex(120, 50, 30);
-        const leaf = hslToHex(100, 55, 35);
-        const stamen = hslToHex((hue + 180) % 360, 90, 70);
+        // Создание гармоничных цветов с использованием теории цвета
+        const primary = hslToHex(baseHue, 70 + Math.random() * 30, 40 + Math.random() * 30); // Основной цвет
+        const secondary = hslToHex((baseHue + 30) % 360, 60 + Math.random() * 35, 45 + Math.random() * 25); // Аналогичный
+        const accent = hslToHex((baseHue + 180) % 360, 65 + Math.random() * 30, 50 + Math.random() * 20); // Комплементарный
+        const accentDark = hslToHex((baseHue + 180) % 360, 70 + Math.random() * 25, 30 + Math.random() * 20); // Темнее комплементарный
+        const stem = hslToHex(120, 40 + Math.random() * 20, 25 + Math.random() * 15); // Зеленые тона для стебля
+        const leaf = hslToHex(100, 45 + Math.random() * 20, 30 + Math.random() * 15); // Зеленые тона для листьев
+        const stamen = hslToHex((baseHue + 150) % 360, 80 + Math.random() * 15, 60 + Math.random() * 20); // Контрастный тычинки
         
         const colors = {
             primary,
@@ -230,372 +100,36 @@ function generateBeeAttractiveColors(variation = 0) {
             stem,
             leaf,
             stamen,
-            scheme: 'bee-attractive'
+            scheme: 'harmonious-theory'
         };
         
-        // Check if this exact palette has been used before
-        if (!isPaletteUsed(colors)) {
-            // Check if any of these colors are too similar to recently used ones
-            if (
-                !isColorTooSimilar(colors.primary, recentColors.primary) &&
-                !isColorTooSimilar(colors.secondary, recentColors.secondary) &&
-                !isColorTooSimilar(colors.accent, recentColors.accent) &&
-                !isColorTooSimilar(colors.accentDark, recentColors.accentDark) &&
-                !isColorTooSimilar(colors.stem, recentColors.stem) &&
-                !isColorTooSimilar(colors.leaf, recentColors.leaf) &&
-                !isColorTooSimilar(colors.stamen, recentColors.stamen)
-            ) {
-                // Mark palette as used before returning
-                markPaletteAsUsed(colors);
-                
-                // Add these colors to recent colors tracking
-                addToRecentColors('primary', colors.primary);
-                addToRecentColors('secondary', colors.secondary);
-                addToRecentColors('accent', colors.accent);
-                addToRecentColors('accentDark', colors.accentDark);
-                addToRecentColors('stem', colors.stem);
-                addToRecentColors('leaf', colors.leaf);
-                addToRecentColors('stamen', colors.stamen);
-                
-                return colors;
-            }
+        // Check if any of these colors are too similar to recently used ones
+        if (
+            !isColorTooSimilar(colors.primary, recentColors.primary) &&
+            !isColorTooSimilar(colors.secondary, recentColors.secondary) &&
+            !isColorTooSimilar(colors.accent, recentColors.accent) &&
+            !isColorTooSimilar(colors.accentDark, recentColors.accentDark) &&
+            !isColorTooSimilar(colors.stem, recentColors.stem) &&
+            !isColorTooSimilar(colors.leaf, recentColors.leaf) &&
+            !isColorTooSimilar(colors.stamen, recentColors.stamen)
+        ) {
+            // Add these colors to recent colors tracking
+            addToRecentColors('primary', colors.primary);
+            addToRecentColors('secondary', colors.secondary);
+            addToRecentColors('accent', colors.accent);
+            addToRecentColors('accentDark', colors.accentDark);
+            addToRecentColors('stem', colors.stem);
+            addToRecentColors('leaf', colors.leaf);
+            addToRecentColors('stamen', colors.stamen);
+            
+            return colors;
         }
         
         attempts++;
     }
     
     // If all attempts fail, return a standard harmonious palette
-    return generateHarmoniousColors();
-}
-
-/**
- * Generate butterfly-attractive colors with given variation
- * @param {number} variation - base hue variation
- * @returns {object} color palette
- */
-function generateButterflyAttractiveColors(variation = 0) {
-    // Use centralized palette manager if available
-    if (typeof window.getUniquePaletteFromJson === 'function') {
-        try {
-            const colors = window.getUniquePaletteFromJson();
-            // Since the centralized manager already ensures uniqueness, we just need to check diversity
-            if (
-                !isColorTooSimilar(colors.primary, recentColors.primary) &&
-                !isColorTooSimilar(colors.secondary, recentColors.secondary) &&
-                !isColorTooSimilar(colors.accent, recentColors.accent) &&
-                !isColorTooSimilar(colors.accentDark, recentColors.accentDark) &&
-                !isColorTooSimilar(colors.stem, recentColors.stem) &&
-                !isColorTooSimilar(colors.leaf, recentColors.leaf) &&
-                !isColorTooSimilar(colors.stamen, recentColors.stamen)
-            ) {
-                // Add these colors to recent colors tracking
-                addToRecentColors('primary', colors.primary);
-                addToRecentColors('secondary', colors.secondary);
-                addToRecentColors('accent', colors.accent);
-                addToRecentColors('accentDark', colors.accentDark);
-                addToRecentColors('stem', colors.stem);
-                addToRecentColors('leaf', colors.leaf);
-                addToRecentColors('stamen', colors.stamen);
-                
-                return {
-                    ...colors,
-                    scheme: 'butterfly-attractive'
-                };
-            } else {
-                // If colors are too similar to recent ones, fall back to algorithmic generation
-            }
-        } catch (e) {
-            console.warn('Centralized palette manager failed, falling back to local algorithm:', e);
-            // Continue with local algorithm below
-        }
-    }
-    
-    // Local algorithm implementation
-    let attempts = 0;
-    const maxAttempts = 10; // Limit attempts to avoid infinite loops
-    
-    while (attempts < maxAttempts) {
-        // Butterflies are particularly attracted to bright red, orange, yellow, pink, and purple
-        const warmHues = [0, 15, 30, 45, 60]; // Red to yellow range
-        const coolHues = [270, 285, 300, 315, 330]; // Pink to purple range
-        
-        const hue = Math.random() > 0.5 ? 
-            warmHues[Math.floor(Math.random() * warmHues.length)] : 
-            coolHues[Math.floor(Math.random() * coolHues.length)];
-        
-        const primary = hslToHex(hue, 90, 60);
-        const secondary = hslToHex((hue + 30) % 360, 80, 70);
-        const accent = hslToHex((hue + 150) % 360, 85, 55);
-        const accentDark = hslToHex((hue + 150) % 360, 90, 45);
-        const stem = hslToHex(120, 50, 30);
-        const leaf = hslToHex(100, 55, 35);
-        const stamen = hslToHex((hue + 180) % 360, 95, 75);
-        
-        const colors = {
-            primary,
-            secondary,
-            accent,
-            accentDark,
-            stem,
-            leaf,
-            stamen,
-            scheme: 'butterfly-attractive'
-        };
-        
-        // Check if this exact palette has been used before
-        if (!isPaletteUsed(colors)) {
-            // Check if any of these colors are too similar to recently used ones
-            if (
-                !isColorTooSimilar(colors.primary, recentColors.primary) &&
-                !isColorTooSimilar(colors.secondary, recentColors.secondary) &&
-                !isColorTooSimilar(colors.accent, recentColors.accent) &&
-                !isColorTooSimilar(colors.accentDark, recentColors.accentDark) &&
-                !isColorTooSimilar(colors.stem, recentColors.stem) &&
-                !isColorTooSimilar(colors.leaf, recentColors.leaf) &&
-                !isColorTooSimilar(colors.stamen, recentColors.stamen)
-            ) {
-                // Mark palette as used before returning
-                markPaletteAsUsed(colors);
-                
-                // Add these colors to recent colors tracking
-                addToRecentColors('primary', colors.primary);
-                addToRecentColors('secondary', colors.secondary);
-                addToRecentColors('accent', colors.accent);
-                addToRecentColors('accentDark', colors.accentDark);
-                addToRecentColors('stem', colors.stem);
-                addToRecentColors('leaf', colors.leaf);
-                addToRecentColors('stamen', colors.stamen);
-                
-                return colors;
-            }
-        }
-        
-        attempts++;
-    }
-    
-    // If all attempts fail, return a standard harmonious palette
-    return generateHarmoniousColors();
-}
-
-/**
- * Generate aggressive colors with given variation
- * @param {number} variation - base hue variation
- * @returns {object} color palette
- */
-function generateAggressiveColors(variation = 0) {
-    // Use centralized palette manager if available
-    if (typeof window.getUniquePaletteFromJson === 'function') {
-        try {
-            const colors = window.getUniquePaletteFromJson();
-            // Since the centralized manager already ensures uniqueness, we just need to check diversity
-            if (
-                !isColorTooSimilar(colors.primary, recentColors.primary) &&
-                !isColorTooSimilar(colors.secondary, recentColors.secondary) &&
-                !isColorTooSimilar(colors.accent, recentColors.accent) &&
-                !isColorTooSimilar(colors.accentDark, recentColors.accentDark) &&
-                !isColorTooSimilar(colors.stem, recentColors.stem) &&
-                !isColorTooSimilar(colors.leaf, recentColors.leaf) &&
-                !isColorTooSimilar(colors.stamen, recentColors.stamen)
-            ) {
-                // Add these colors to recent colors tracking
-                addToRecentColors('primary', colors.primary);
-                addToRecentColors('secondary', colors.secondary);
-                addToRecentColors('accent', colors.accent);
-                addToRecentColors('accentDark', colors.accentDark);
-                addToRecentColors('stem', colors.stem);
-                addToRecentColors('leaf', colors.leaf);
-                addToRecentColors('stamen', colors.stamen);
-                
-                return {
-                    ...colors,
-                    scheme: 'aggressive'
-                };
-            } else {
-                // If colors are too similar to recent ones, fall back to algorithmic generation
-            }
-        } catch (e) {
-            console.warn('Centralized palette manager failed, falling back to local algorithm:', e);
-            // Continue with local algorithm below
-        }
-    }
-    
-    // Local algorithm implementation
-    let attempts = 0;
-    const maxAttempts = 10; // Limit attempts to avoid infinite loops
-    
-    while (attempts < maxAttempts) {
-        // Aggressive colors tend to be high contrast - reds, oranges, darks
-        const redHues = [0, 15, 30]; // Red to orange-red range
-        
-        const hue = redHues[Math.floor(Math.random() * redHues.length)];
-        
-        const primary = hslToHex(hue, 95, 50);
-        const secondary = hslToHex((hue + 30) % 360, 85, 40);
-        const accent = hslToHex((hue + 180) % 360, 90, 30); // Complementary for contrast
-        const accentDark = hslToHex((hue + 180) % 360, 95, 20);
-        const stem = hslToHex(120, 40, 25); // More muted stem
-        const leaf = hslToHex(100, 45, 30);
-        const stamen = hslToHex((hue + 180) % 360, 100, 60); // Bright contrasting stamen
-        
-        const colors = {
-            primary,
-            secondary,
-            accent,
-            accentDark,
-            stem,
-            leaf,
-            stamen,
-            scheme: 'aggressive'
-        };
-        
-        // Check if this exact palette has been used before
-        if (!isPaletteUsed(colors)) {
-            // Check if any of these colors are too similar to recently used ones
-            if (
-                !isColorTooSimilar(colors.primary, recentColors.primary) &&
-                !isColorTooSimilar(colors.secondary, recentColors.secondary) &&
-                !isColorTooSimilar(colors.accent, recentColors.accent) &&
-                !isColorTooSimilar(colors.accentDark, recentColors.accentDark) &&
-                !isColorTooSimilar(colors.stem, recentColors.stem) &&
-                !isColorTooSimilar(colors.leaf, recentColors.leaf) &&
-                !isColorTooSimilar(colors.stamen, recentColors.stamen)
-            ) {
-                // Mark palette as used before returning
-                markPaletteAsUsed(colors);
-                
-                // Add these colors to recent colors tracking
-                addToRecentColors('primary', colors.primary);
-                addToRecentColors('secondary', colors.secondary);
-                addToRecentColors('accent', colors.accent);
-                addToRecentColors('accentDark', colors.accentDark);
-                addToRecentColors('stem', colors.stem);
-                addToRecentColors('leaf', colors.leaf);
-                addToRecentColors('stamen', colors.stamen);
-                
-                return colors;
-            }
-        }
-        
-        attempts++;
-    }
-    
-    // If all attempts fail, return a standard harmonious palette
-    return generateHarmoniousColors();
-}
-
-/**
- * Generate insect-attractive colors with given variation
- * @param {number} variation - base hue variation
- * @returns {object} color palette
- */
-function generateInsectAttractiveColors(variation = 0) {
-    // Use centralized palette manager if available
-    if (typeof window.getUniquePaletteFromJson === 'function') {
-        try {
-            const colors = window.getUniquePaletteFromJson();
-            // Since the centralized manager already ensures uniqueness, we just need to check diversity
-            if (
-                !isColorTooSimilar(colors.primary, recentColors.primary) &&
-                !isColorTooSimilar(colors.secondary, recentColors.secondary) &&
-                !isColorTooSimilar(colors.accent, recentColors.accent) &&
-                !isColorTooSimilar(colors.accentDark, recentColors.accentDark) &&
-                !isColorTooSimilar(colors.stem, recentColors.stem) &&
-                !isColorTooSimilar(colors.leaf, recentColors.leaf) &&
-                !isColorTooSimilar(colors.stamen, recentColors.stamen)
-            ) {
-                // Add these colors to recent colors tracking
-                addToRecentColors('primary', colors.primary);
-                addToRecentColors('secondary', colors.secondary);
-                addToRecentColors('accent', colors.accent);
-                addToRecentColors('accentDark', colors.accentDark);
-                addToRecentColors('stem', colors.stem);
-                addToRecentColors('leaf', colors.leaf);
-                addToRecentColors('stamen', colors.stamen);
-                
-                return {
-                    ...colors,
-                    scheme: 'insect-attractive'
-                };
-            } else {
-                // If colors are too similar to recent ones, fall back to algorithmic generation
-            }
-        } catch (e) {
-            console.warn('Centralized palette manager failed, falling back to local algorithm:', e);
-            // Continue with local algorithm below
-        }
-    }
-    
-    // Local algorithm implementation
-    let attempts = 0;
-    const maxAttempts = 10; // Limit attempts to avoid infinite loops
-    
-    while (attempts < maxAttempts) {
-        // Combination of bee and butterfly attractive colors
-        const hue = (variation + (Math.random() > 0.5 ? 0 : 180)) % 360;
-        
-        const primary = hslToHex(hue, 85, 55);
-        const secondary = hslToHex((hue + 30) % 360, 75, 65);
-        const accent = hslToHex((hue + 150) % 360, 80, 50);
-        const accentDark = hslToHex((hue + 150) % 360, 85, 40);
-        const stem = hslToHex(120, 50, 30);
-        const leaf = hslToHex(100, 55, 35);
-        const stamen = hslToHex((hue + 180) % 360, 90, 70);
-        
-        const colors = {
-            primary,
-            secondary,
-            accent,
-            accentDark,
-            stem,
-            leaf,
-            stamen,
-            scheme: 'insect-attractive'
-        };
-        
-        // Check if this exact palette has been used before
-        if (!isPaletteUsed(colors)) {
-            // Check if any of these colors are too similar to recently used ones
-            if (
-                !isColorTooSimilar(colors.primary, recentColors.primary) &&
-                !isColorTooSimilar(colors.secondary, recentColors.secondary) &&
-                !isColorTooSimilar(colors.accent, recentColors.accent) &&
-                !isColorTooSimilar(colors.accentDark, recentColors.accentDark) &&
-                !isColorTooSimilar(colors.stem, recentColors.stem) &&
-                !isColorTooSimilar(colors.leaf, recentColors.leaf) &&
-                !isColorTooSimilar(colors.stamen, recentColors.stamen)
-            ) {
-                // Mark palette as used before returning
-                markPaletteAsUsed(colors);
-                
-                // Add these colors to recent colors tracking
-                addToRecentColors('primary', colors.primary);
-                addToRecentColors('secondary', colors.secondary);
-                addToRecentColors('accent', colors.accent);
-                addToRecentColors('accentDark', colors.accentDark);
-                addToRecentColors('stem', colors.stem);
-                addToRecentColors('leaf', colors.leaf);
-                addToRecentColors('stamen', colors.stamen);
-                
-                return colors;
-            }
-        }
-        
-        attempts++;
-    }
-    
-    // If all attempts fail, return a standard harmonious palette
-    return generateHarmoniousColors();
-}
-
-// Palette uniqueness functions (these would normally be imported from palette-manager.js)
-// For now, define basic implementations
-function isPaletteUsed(colors) {
-    // Placeholder implementation - in actual code this would check against a set of used palettes
-    return false;
-}
-
-function markPaletteAsUsed(colors) {
-    // Placeholder implementation - in actual code this would record the palette as used
+    return generateRandomColors();
 }
 
 // Define generateRandomFlower function in this module
@@ -730,30 +264,49 @@ function generateRandomFlower() {
 }
 
 /**
- * Check if colors pass diversity requirements
- * @param {object} colors - Object containing color properties
- * @returns {boolean} True if colors pass diversity check
- */
-function passesDiversityCheck(colors) {
-    // Check if any two colors are too similar
-    const colorKeys = ['primary', 'secondary', 'accent', 'accentDark', 'stem', 'leaf', 'stamen'];
-    for (let i = 0; i < colorKeys.length; i++) {
-        for (let j = i + 1; j < colorKeys.length; j++) {
-            // Create a temporary array with one color to compare against
-            if (isColorTooSimilar(colors[colorKeys[i]], [colors[colorKeys[j]]])) {
-                return false;
-            }
-        }
-    }
-    return true;
-}
-
-/**
  * Get all generated flowers
  * @returns {Array} Array of generated flower objects
  */
 function getAllFlowersWithGenerated() {
     return [...generatedFlowers];
+}
+
+/**
+ * Reset generated flowers pool and color tracking
+ */
+function resetGeneratedFlowers() {
+    generatedFlowers = [];
+    generationCounter = 0; // Reset the generation counter as well
+    // Reset the recent colors tracking to allow full color diversity again
+    for (let key in recentColors) {
+        recentColors[key] = [];
+    }
+    // Reset the recent flowers queue
+    recentFlowersQueue.length = 0; // Clear the array
+    // Reset used palettes tracking using centralized manager if available
+    if (typeof window.resetUsedPalettes === 'function') {
+        try {
+            window.resetUsedPalettes();
+        } catch (e) {
+            console.warn('Failed to reset palette tracking via centralized manager:', e);
+        }
+    }
+    // Also reset color history if available
+    if (typeof window.resetColorHistory === 'function') {
+        try {
+            window.resetColorHistory();
+        } catch (e) {
+            console.warn('Failed to reset color history via centralized manager:', e);
+        }
+    }
+    // Also reset component color tracking if available
+    if (typeof window.resetUsedComponentColors === 'function') {
+        try {
+            window.resetUsedComponentColors();
+        } catch (e) {
+            console.warn('Failed to reset component color tracking via centralized manager:', e);
+        }
+    }
 }
 
 /**
@@ -776,6 +329,47 @@ function generateRandomFlowerBatch(count) {
     }
 }
 
+// Function to log all generated flowers with their properties
+function logGeneratedFlowers(allFlowers) {
+    // Проверяем, определен ли параметр allFlowers
+    if (!allFlowers) {
+        // Если allFlowers не передан, используем глобальный массив generatedFlowers
+        allFlowers = generatedFlowers;
+    }
+    
+    console.log(`%c=== Generated Flowers (${allFlowers.length} total) ===`, 'color: #4CAF50; font-weight: bold; font-size: 16px;');
+    
+    allFlowers.forEach((flower, index) => {
+        const patternNames = {
+            'none': 'No Tessellation',
+            'triangles': 'Triangles',
+            'squares': 'Squares',
+            'pentagons': 'Pentagons',
+            'diamonds': 'Diamonds',
+            'cells': 'Cells',
+            'stars': 'Stars'
+        };
+        
+        const patternName = patternNames[flower.centerPattern] || flower.centerPattern;
+        const flowerTypeName = flower.type;
+        const paletteInfo = {
+            'Primary Petal Color': flower.petalColor,
+            'Secondary Petal Color': flower.petalColor2,
+            'Center Accent Color': flower.centerColor,
+            'Center Dark Accent Color': flower.centerColor2,
+            'Stem Color': flower.stemColor,
+            'Leaf Color': flower.leafColor,
+            'Stamen Color': flower.stamenColor
+        };
+        
+        console.group(`%cFlower #${index + 1}: ${flowerTypeName} with ${patternName}`, 'color: #2196F3; font-weight: bold;');
+        console.table(paletteInfo);
+        console.groupEnd();
+    });
+    
+    console.log('%c=== End of Generated Flowers ===', 'color: #4CAF50; font-weight: bold; font-size: 16px;');
+}
+
 // Make functions available globally
 if (typeof window !== 'undefined') {
     window.generateRandomFlower = () => {
@@ -786,7 +380,19 @@ if (typeof window !== 'undefined') {
         return flower;
     };
     window.generateRandomFlowerBatch = (count) => {
-        generateRandomFlowerBatch(count); // Call the named function
+        for (let i = 0; i < count; i++) {
+            const flower = generateRandomFlower();
+            flower.generationNumber = ++generationCounter;
+            generatedFlowers.push(flower);
+            addToRecentFlowers(flower);
+        }
+        
+        // Automatically log flower info if we've generated 50 flowers
+        if (count === 50) {
+            setTimeout(() => {
+                logGeneratedFlowers(generatedFlowers);
+            }, 100); // Delay to ensure all flowers are processed
+        }
     };
     window.getAllFlowersWithGenerated = getAllFlowersWithGenerated;
     window.resetGeneratedFlowers = resetGeneratedFlowers;

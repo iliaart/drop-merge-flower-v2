@@ -2,7 +2,7 @@
 import { state } from './state.js';
 import { CONFIG } from './config.js';
 import { getAllFlowersWithGenerated } from './random-flowers.js';
-import { clamp, ease, rgba } from './utils.js';
+import { clamp, ease, rgba, TAU } from './utils.js';
 import { getFlowerCache } from './flower-cache.js';
 import { drawStamens } from './stamens.js';
 
@@ -341,4 +341,15 @@ export function drawFlower(ctx, flower, t) {
     ctx.strokeText(`${f.generationNumber || '?'}`, 0, 0);
     ctx.fillText(`${f.generationNumber || '?'}`, 0, 0);
     ctx.restore();
+    
+    // Draw selection indicator if this is the selected flower
+    if (state.selectedFlower === flower) {
+        ctx.save();
+        ctx.strokeStyle = 'rgba(255, 255, 0, 0.7)'; // Yellow selection ring
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.arc(pos.x, pos.y, r + 5, 0, TAU); // Slightly larger than flower radius
+        ctx.stroke();
+        ctx.restore();
+    }
 }

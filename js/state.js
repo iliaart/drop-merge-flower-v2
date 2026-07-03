@@ -48,4 +48,8 @@ export const state = {
     canvasScale: 1,
     canvasOffsetX: 0,
     canvasOffsetY: 0,
+    
+    // Flower selection properties
+    selectedFlower: null,
+    isDragging: false,
 };

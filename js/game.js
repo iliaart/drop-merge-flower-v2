@@ -430,6 +430,23 @@ function gameLoop(timestamp) {
     for (const f of state.flowers) { if (f) drawFlower(ctx, f, state.time); }
     state.particles.draw(ctx);
 
+    // Draw selected flower indicator if there is one
+    if (state.selectedFlower) {
+        const pos = state.selectedFlower.body.position;
+        const allFlowers = getAllFlowersWithGenerated();
+        const f = allFlowers[state.selectedFlower.level];
+        const r = f.radius;
+        
+        // Draw a selection ring around the selected flower
+        ctx.save();
+        ctx.strokeStyle = 'rgba(255, 255, 0, 0.7)'; // Yellow selection ring
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.arc(pos.x, pos.y, r + 5, 0, TAU); // Slightly larger than flower radius
+        ctx.stroke();
+        ctx.restore();
+    }
+
     drawPreviewFlower(ctx, state.time);
     drawNextPreview(ctx, state.time);
     drawHighestLevel(ctx);

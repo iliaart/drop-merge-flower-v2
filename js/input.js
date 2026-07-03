@@ -4,7 +4,7 @@ import { CONFIG } from './config.js';
 import { dropFlower } from './game.js';
 import { getAllFlowersWithGenerated } from './random-flowers.js';
 
-const { GW, GH, VASE } = CONFIG;
+const { GW, GH } = CONFIG;
 
 /** Resize canvas to fit viewport while maintaining game aspect ratio */
 export function resizeCanvas() {
@@ -71,6 +71,11 @@ function getFlowerAtPosition(x, y) {
 
 /** Set up all input event listeners */
 export function setupInput() {
+    // Helper function to clamp value within bounds
+    function clamp(value, min, max) {
+        return Math.min(Math.max(value, min), max);
+    }
+    
     state.canvas.addEventListener('mousemove', e => {
         const p = screenToGame(e.clientX, e.clientY);
         state.mouseX = p.x;
@@ -78,8 +83,16 @@ export function setupInput() {
         // Handle flower dragging
         if (state.isDragging && state.selectedFlower) {
             const flowerBody = state.selectedFlower.body;
-            // Move the flower to the mouse position
-            state.Matter.Body.setPosition(flowerBody, { x: p.x, y: p.y });
+            const allFlowers = getAllFlowersWithGenerated();
+            const flowerData = allFlowers[state.selectedFlower.level];
+            const radius = flowerData.radius;
+            
+            // Clamp the position to stay within vase boundaries
+            const clampedX = clamp(p.x, CONFIG.VASE.l + radius, CONFIG.VASE.r - radius);
+            const clampedY = clamp(p.y, CONFIG.VASE.t + radius, CONFIG.VASE.b - radius);
+            
+            // Move the flower to the clamped mouse position
+            state.Matter.Body.setPosition(flowerBody, { x: clampedX, y: clampedY });
             // Reset velocity to prevent physics interference
             state.Matter.Body.setVelocity(flowerBody, { x: 0, y: 0 });
             state.Matter.Body.setAngularVelocity(flowerBody, 0);
@@ -98,16 +111,16 @@ export function setupInput() {
                 state.selectedFlower = clickedFlower;
             }
         } else {
-            // If clicking on empty space in the vase area and can drop, trigger dropFlower
-            if (p.x >= VASE.l && p.x <= VASE.r && p.y >= VASE.t && p.y <= VASE.b) {
-                if (state.canDrop) {
-                    // Update mouse position and trigger flower drop
-                    state.mouseX = p.x;
-                    dropFlower();
-                }
+            // If clicking on empty space within vase, deselect and potentially drop a new flower
+            if (p.x >= CONFIG.VASE.l && p.x <= CONFIG.VASE.r && 
+                p.y >= CONFIG.VASE.t && p.y <= CONFIG.VASE.b) {
+                state.selectedFlower = null;
+                state.audio.ensure();
+                dropFlower();
+            } else {
+                // Clicked outside vase area, just deselect
+                state.selectedFlower = null;
             }
-            // Deselect any selected flower
-            state.selectedFlower = null;
         }
     });
 
@@ -120,12 +133,6 @@ export function setupInput() {
         if (clickedFlower) {
             state.selectedFlower = clickedFlower;
             state.isDragging = true;
-        } else {
-            // If clicking on empty space in the vase area, prepare for a new flower drop
-            if (p.x >= VASE.l && p.x <= VASE.r && p.y >= VASE.t && p.y <= VASE.b) {
-                state.mouseX = p.x;
-                state.selectedFlower = null;
-            }
         }
     });
 
@@ -134,11 +141,13 @@ export function setupInput() {
         if (state.isDragging && state.selectedFlower) {
             // Check if the flower was dropped in the vase area
             const flowerPos = state.selectedFlower.body.position;
-            if (flowerPos.x >= VASE.l && flowerPos.x <= VASE.r && 
-                flowerPos.y >= VASE.t && flowerPos.y <= VASE.b) {
+            if (flowerPos.x >= CONFIG.VASE.l && flowerPos.x <= CONFIG.VASE.r && 
+                flowerPos.y >= CONFIG.VASE.t && flowerPos.y <= CONFIG.VASE.b) {
                 // Flower is in the vase, keep it there
+                // You could add additional logic here if needed
             } else {
-                // Flower is outside the vase
+                // Flower is outside the vase, you might want to remove it or return it
+                // For now, we'll just stop dragging
             }
         }
         state.isDragging = false;
@@ -158,14 +167,15 @@ export function setupInput() {
             state.selectedFlower = touchedFlower;
             state.isDragging = true;
         } else {
-            // If touching empty space in the vase area and can drop, try to drop a flower
-            if (p.x >= VASE.l && p.x <= VASE.r && p.y >= VASE.t && p.y <= VASE.b) {
-                if (state.canDrop) {
-                    state.mouseX = p.x;
-                    dropFlower();
-                }
+            // If touching empty space within vase, deselect and potentially drop a new flower
+            if (p.x >= CONFIG.VASE.l && p.x <= CONFIG.VASE.r && 
+                p.y >= CONFIG.VASE.t && p.y <= CONFIG.VASE.b) {
+                state.selectedFlower = null;
+                dropFlower();
+            } else {
+                // Touch outside vase area, just deselect
+                state.selectedFlower = null;
             }
-            state.selectedFlower = null;
         }
     }, { passive: false });
 
@@ -178,7 +188,15 @@ export function setupInput() {
         // Handle dragging during touch move
         if (state.isDragging && state.selectedFlower) {
             const flowerBody = state.selectedFlower.body;
-            state.Matter.Body.setPosition(flowerBody, { x: p.x, y: p.y });
+            const allFlowers = getAllFlowersWithGenerated();
+            const flowerData = allFlowers[state.selectedFlower.level];
+            const radius = flowerData.radius;
+            
+            // Clamp the position to stay within vase boundaries
+            const clampedX = clamp(p.x, CONFIG.VASE.l + radius, CONFIG.VASE.r - radius);
+            const clampedY = clamp(p.y, CONFIG.VASE.t + radius, CONFIG.VASE.b - radius);
+            
+            state.Matter.Body.setPosition(flowerBody, { x: clampedX, y: clampedY });
             state.Matter.Body.setVelocity(flowerBody, { x: 0, y: 0 });
             state.Matter.Body.setAngularVelocity(flowerBody, 0);
         }
@@ -186,18 +204,6 @@ export function setupInput() {
 
     state.canvas.addEventListener('touchend', e => {
         e.preventDefault();
-        
-        // Check if we were dragging a flower and released it
-        if (state.isDragging && state.selectedFlower) {
-            // Check if the flower was dropped in the vase area
-            const flowerPos = state.selectedFlower.body.position;
-            if (flowerPos.x >= VASE.l && flowerPos.x <= VASE.r && 
-                flowerPos.y >= VASE.t && flowerPos.y <= VASE.b) {
-                // Flower is in the vase, keep it there
-            } else {
-                // Flower is outside the vase
-            }
-        }
         state.isDragging = false;
     }, { passive: false });
 

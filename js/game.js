@@ -426,8 +426,32 @@ function gameLoop(timestamp) {
 
     drawBackground(ctx);
     drawVase(ctx);
-    state.ambientMotes.forEach(m => m.draw(ctx, state.time));
-    for (const f of state.flowers) { if (f) drawFlower(ctx, f, state.time); }
+    state.ambientMotes.forEach(m => m.update(ctx, state.time));
+
+    // Separate the flowers into selected and unselected for rendering order
+    const unselectedFlowers = [];
+    let selectedFlowerToRender = null;
+
+    for (const f of state.flowers) {
+        if (f) {
+            if (state.selectedFlower === f) {
+                selectedFlowerToRender = f;
+            } else {
+                unselectedFlowers.push(f);
+            }
+        }
+    }
+
+    // Draw unselected flowers first
+    for (const f of unselectedFlowers) {
+        drawFlower(ctx, f, state.time);
+    }
+
+    // Then draw the selected flower on top
+    if (selectedFlowerToRender) {
+        drawFlower(ctx, selectedFlowerToRender, state.time);
+    }
+
     state.particles.draw(ctx);
 
     // Draw selected flower indicator if there is one
@@ -436,14 +460,29 @@ function gameLoop(timestamp) {
         const allFlowers = getAllFlowersWithGenerated();
         const f = allFlowers[state.selectedFlower.level];
         const r = f.radius;
-        
+
         // Draw a selection ring around the selected flower
         ctx.save();
         ctx.strokeStyle = 'rgba(255, 255, 0, 0.7)'; // Yellow selection ring
         ctx.lineWidth = 3;
         ctx.beginPath();
-        ctx.arc(pos.x, pos.y, r + 5, 0, TAU); // Slightly larger than flower radius
+        ctx.arc(pos.x, pos.y, Math.max(r + 10, 25), 0, TAU); // Slightly larger than flower radius
+
+        // Add a glow effect for better visibility
+        ctx.shadowColor = 'rgba(255, 255, 0, 0.6)';
+        ctx.shadowBlur = 10;
+
         ctx.stroke();
+
+        // Draw an arrow pointing to the selected flower
+        ctx.beginPath();
+        ctx.moveTo(pos.x, pos.y - (Math.max(r + 15, 30)));
+        ctx.lineTo(pos.x - 5, pos.y - (Math.max(r + 25, 40)));
+        ctx.lineTo(pos.x + 5, pos.y - (Math.max(r + 25, 40)));
+        ctx.closePath();
+        ctx.fillStyle = 'rgba(255, 255, 0, 0.7)';
+        ctx.fill();
+
         ctx.restore();
     }
 

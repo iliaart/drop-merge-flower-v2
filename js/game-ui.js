@@ -342,14 +342,5 @@ export function drawFlower(ctx, flower, t) {
     ctx.fillText(`${f.generationNumber || '?'}`, 0, 0);
     ctx.restore();
     
-    // Draw selection indicator if this is the selected flower
-    if (state.selectedFlower === flower) {
-        ctx.save();
-        ctx.strokeStyle = 'rgba(255, 255, 0, 0.7)'; // Yellow selection ring
-        ctx.lineWidth = 3;
-        ctx.beginPath();
-        ctx.arc(pos.x, pos.y, r + 5, 0, TAU); // Slightly larger than flower radius
-        ctx.stroke();
-        ctx.restore();
-    }
+    // Note: Selection indicator is now drawn in the main game loop to ensure proper layering
 }

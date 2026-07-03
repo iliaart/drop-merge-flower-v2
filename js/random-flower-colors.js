@@ -1,5 +1,5 @@
 // Random Flower Colors Module for the game
-import { hslToHex } from './utils-wrapper.mjs';
+import { hslToHex } from './utils.js';
 
 // Define recursion tracking keys outside functions to persist between calls
 const PASSES_DIVERSITY_CHECK_RECURSION_KEY = Symbol('passesDiversityCheckRecursionDepth');

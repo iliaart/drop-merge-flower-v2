@@ -187,26 +187,64 @@ function cleanupFlowers() {
 
 export function dropFlower() {
     if (!state.canDrop || state.gameState !== 'playing') return;
+    
+    const allFlowers = getAllFlowersWithGenerated();
+    
+    // Проверяем, что массив цветков не пуст
+    if (allFlowers.length === 0) {
+        console.warn('dropFlower: no flowers generated yet, skipping drop');
+        return;
+    }
+    
+    // Проверяем, что currentLevel является допустимым индексом
+    if (state.currentLevel < 0 || state.currentLevel >= allFlowers.length) {
+        console.error('dropFlower: currentLevel is out of bounds', state.currentLevel, 'with flowers array length', allFlowers.length);
+        return;
+    }
+    
+    const f = allFlowers[state.currentLevel];
+    
+    // Проверяем, существует ли цветок и имеет ли он необходимые свойства
+    if (!f || typeof f.radius === 'undefined') {
+        console.error('dropFlower: flower object is undefined or missing radius property for level', state.currentLevel);
+        return;
+    }
+    
     state.canDrop = false;
     state.audio.ensure();
     state.audio.playDrop();
-
-    const allFlowers = getAllFlowersWithGenerated();
-    const f = allFlowers[state.currentLevel];
+    
     const x = clamp(state.mouseX, VASE.l + f.radius + 5, VASE.r - f.radius - 5);
     const flower = createFlower(x, DROP_Y, state.currentLevel);
     if (flower) {
         flower.justSpawned = false;
         spawnDropParticles(state.particles, x, DROP_Y, state.currentLevel);
     }
-    state.dropCooldown = .35;
-    setTimeout(prepareNextFlower, 350);
+    state.dropCooldown = .3; // Changed from .35 to .3 (0.3 seconds)
+    setTimeout(prepareNextFlower, 300); // Changed from 350 to 300ms
 }
+
+// Global variable to track if mouse button is held down
+window.isMouseDown = false;
 
 function prepareNextFlower() {
     state.currentLevel = state.nextLevel;
     state.nextLevel = pickLevel();
     state.canDrop = true;
+    
+    // If mouse button is still held down, drop another flower immediately
+    if (window.isMouseDown && state.gameState === 'playing') {
+        // Check if mouse is within vase area before dropping
+        const allFlowers = getAllFlowersWithGenerated();
+        if (allFlowers.length > 0 && state.mouseX >= CONFIG.VASE.l && state.mouseX <= CONFIG.VASE.r) {
+            setTimeout(() => {
+                if (window.isMouseDown && state.canDrop && state.gameState === 'playing') {
+                    state.audio.ensure();
+                    dropFlower();
+                }
+            }, 10); // Small delay to avoid race conditions
+        }
+    }
 }
 
 export function restart() {

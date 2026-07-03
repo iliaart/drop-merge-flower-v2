@@ -69,6 +69,7 @@ function getFlowerAtPosition(x, y) {
     return null;
 }
 
+
 /** Set up all input event listeners */
 export function setupInput() {
     // Helper function to clamp value within bounds
@@ -101,6 +102,8 @@ export function setupInput() {
 
     state.canvas.addEventListener('click', e => {
         const p = screenToGame(e.clientX, e.clientY);
+        state.lastMouseX = p.x;
+        state.lastMouseY = p.y;
         
         // Check if clicking on an existing flower
         const clickedFlower = getFlowerAtPosition(p.x, p.y);
@@ -126,6 +129,9 @@ export function setupInput() {
 
     state.canvas.addEventListener('mousedown', e => {
         const p = screenToGame(e.clientX, e.clientY);
+        state.lastMouseX = p.x;
+        state.lastMouseY = p.y;
+        isMouseDown = true;
         
         // Check if clicking on a flower to start dragging
         const clickedFlower = getFlowerAtPosition(p.x, p.y);
@@ -133,10 +139,27 @@ export function setupInput() {
         if (clickedFlower) {
             state.selectedFlower = clickedFlower;
             state.isDragging = true;
+        } else {
+            // If mouse is within vase area, start continuous dropping
+            if (p.x >= CONFIG.VASE.l && p.x <= CONFIG.VASE.r && 
+                p.y >= CONFIG.VASE.t && p.y <= CONFIG.VASE.b) {
+                state.selectedFlower = null;
+                        
+                // Set the global mouse down state
+                window.isMouseDown = true;
+                        
+                state.audio.ensure();
+                dropFlower();
+            } else {
+                // Mouse down outside vase area, just deselect
+                state.selectedFlower = null;
+            }
         }
     });
 
     state.canvas.addEventListener('mouseup', e => {
+        // Reset the global mouse down state
+        window.isMouseDown = false;
         // Stop dragging when mouse is released
         if (state.isDragging && state.selectedFlower) {
             // Check if the flower was dropped in the vase area
@@ -153,12 +176,21 @@ export function setupInput() {
         state.isDragging = false;
     });
 
+    state.canvas.addEventListener('mouseleave', e => {
+        // Reset the global mouse down state when mouse leaves canvas
+        window.isMouseDown = false;
+        if (state.isDragging) {
+            state.isDragging = false;
+        }
+    });
+
     state.canvas.addEventListener('touchstart', e => {
         e.preventDefault();
-        state.audio.ensure();
         const touch = e.touches[0];
         const p = screenToGame(touch.clientX, touch.clientY);
         state.mouseX = p.x;
+        state.lastMouseX = p.x;
+        state.lastMouseY = p.y;
         
         // Touch support for flower selection
         const touchedFlower = getFlowerAtPosition(p.x, p.y);
@@ -167,10 +199,15 @@ export function setupInput() {
             state.selectedFlower = touchedFlower;
             state.isDragging = true;
         } else {
-            // If touching empty space within vase, deselect and potentially drop a new flower
+            // If touching empty space within vase, deselect and start continuous drop
             if (p.x >= CONFIG.VASE.l && p.x <= CONFIG.VASE.r && 
                 p.y >= CONFIG.VASE.t && p.y <= CONFIG.VASE.b) {
                 state.selectedFlower = null;
+                        
+                // Set the global mouse down state for touch
+                window.isMouseDown = true;
+                        
+                state.audio.ensure();
                 dropFlower();
             } else {
                 // Touch outside vase area, just deselect
@@ -184,6 +221,8 @@ export function setupInput() {
         const touch = e.touches[0];
         const p = screenToGame(touch.clientX, touch.clientY);
         state.mouseX = p.x;
+        state.lastMouseX = p.x;
+        state.lastMouseY = p.y;
         
         // Handle dragging during touch move
         if (state.isDragging && state.selectedFlower) {
@@ -204,6 +243,7 @@ export function setupInput() {
 
     state.canvas.addEventListener('touchend', e => {
         e.preventDefault();
+        stopContinuousDrop(); // Stop continuous drop on touch end
         state.isDragging = false;
     }, { passive: false });
 

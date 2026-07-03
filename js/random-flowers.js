@@ -353,16 +353,20 @@ function logGeneratedFlowers(allFlowers) {
         const patternName = patternNames[flower.centerPattern] || flower.centerPattern;
         const flowerTypeName = flower.type;
         const paletteInfo = {
+            'Generation Number': flower.generationNumber,  // Добавляем номер генерации в информацию о цветке
+            'Flower Type': flowerTypeName,
             'Primary Petal Color': flower.petalColor,
             'Secondary Petal Color': flower.petalColor2,
             'Center Accent Color': flower.centerColor,
             'Center Dark Accent Color': flower.centerColor2,
             'Stem Color': flower.stemColor,
             'Leaf Color': flower.leafColor,
-            'Stamen Color': flower.stamenColor
+            'Stamen Color': flower.stamenColor,
+            'Radius': flower.radius,
+            'Petals Count': flower.petals
         };
         
-        console.group(`%cFlower #${index + 1}: ${flowerTypeName} with ${patternName}`, 'color: #2196F3; font-weight: bold;');
+        console.group(`%cFlower #${flower.generationNumber} [${index + 1}/${allFlowers.length}]: ${flowerTypeName} with ${patternName}`, 'color: #2196F3; font-weight: bold;');
         console.table(paletteInfo);
         console.groupEnd();
     });

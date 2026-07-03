@@ -130,6 +130,21 @@ export function drawPreviewFlower(ctx, t) {
     ctx.stroke();
     ctx.setLineDash([]);
     ctx.restore();
+    
+    // Draw the generation number above the preview flower
+    ctx.save();
+    ctx.translate(x, DROP_Y + bob - r - 15); // Position above the flower (using same offset as in drawFlower)
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.font = 'bold 14px Georgia, "Times New Roman", serif'; // Using Georgia as required by spec with fallbacks
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.9)'; // Slightly increased opacity
+    ctx.strokeStyle = 'rgba(0, 0, 0, 0.7)'; // Increased opacity for better contrast
+    ctx.lineWidth = 2; // Increased line width for better visibility
+    
+    // Draw text with outline first, then fill
+    ctx.strokeText(`${f.generationNumber || '?'}`, 0, 0);
+    ctx.fillText(`${f.generationNumber || '?'}`, 0, 0);
+    ctx.restore();
 }
 
 /** Draw next flower preview */
@@ -146,6 +161,21 @@ export function drawNextPreview(ctx, t) {
     ctx.scale(.5, .5);
     ctx.drawImage(cache.canvas, -cache.cx * 2, -cache.cy * 2, cache.canvas.width, cache.canvas.height);
     drawStamens(ctx, state.nextLevel, r, t, 1.5, 0);
+    ctx.restore();
+
+    // Draw the generation number above the next flower preview
+    ctx.save();
+    ctx.translate(VASE.r + 30, VASE.t + 30 - (r * 0.5) - 15); // Position above the flower (adjusting for the scale of 0.5)
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.font = 'bold 14px Georgia, "Times New Roman", serif'; // Using Georgia as required by spec with fallbacks
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.9)'; // Slightly increased opacity
+    ctx.strokeStyle = 'rgba(0, 0, 0, 0.7)'; // Increased opacity for better contrast
+    ctx.lineWidth = 2; // Increased line width for better visibility
+    
+    // Draw text with outline first, then fill
+    ctx.strokeText(`${f.generationNumber || '?'}`, 0, 0);
+    ctx.fillText(`${f.generationNumber || '?'}`, 0, 0);
     ctx.restore();
 
     ctx.save();
@@ -302,12 +332,12 @@ export function drawFlower(ctx, flower, t) {
     ctx.translate(pos.x, pos.y - r - 15); // Position above the flower
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.font = 'bold 12px Georgia';
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
-    ctx.strokeStyle = 'rgba(0, 0, 0, 0.5)';
-    ctx.lineWidth = 1;
+    ctx.font = 'bold 14px Georgia, "Times New Roman", serif'; // Using Georgia as required by spec with fallbacks
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.9)'; // Slightly increased opacity
+    ctx.strokeStyle = 'rgba(0, 0, 0, 0.7)'; // Increased opacity for better contrast
+    ctx.lineWidth = 2; // Increased line width for better visibility
     
-    // Draw text with outline
+    // Draw text with outline first, then fill
     ctx.strokeText(`${f.generationNumber || '?'}`, 0, 0);
     ctx.fillText(`${f.generationNumber || '?'}`, 0, 0);
     ctx.restore();

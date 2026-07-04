@@ -263,6 +263,9 @@ export function setupInput() {
                 });
             }
             
+            // Reset the selected flower BEFORE creating the new flower to prevent any highlighting
+            state.selectedFlower = null;
+            
             // Create a new flower at the same position with preserved rotation
             const newFlower = window.createFlower(position.x, position.y, level);
             if (newFlower) {
@@ -274,8 +277,12 @@ export function setupInput() {
                 newFlower.body.gravityScale = flowerBeingDragged.originalGravityScale || 1;
                 
                 // Ensure the new flower is not selected - this is crucial to prevent yellow circle
+                // Reset the selected flower BEFORE creating the new flower to prevent any highlighting
                 state.selectedFlower = null;
             }
+        } else {
+            // If we weren't dragging a flower, just reset the selection
+            state.selectedFlower = null;
         }
         state.isDragging = false;
     });

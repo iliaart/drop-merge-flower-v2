@@ -633,7 +633,8 @@ function renderFrame() {
     state.particles.draw(ctx);
 
     // Draw selected flower indicator if there is one
-    if (state.selectedFlower) {
+    // NOTE: Only show highlight when flower is being dragged (kinetic state), not just selected
+    if (state.selectedFlower && state.isDragging) {
         const pos = state.selectedFlower.body.position;
         const allFlowers = getAllFlowersWithGenerated();
         const f = allFlowers[state.selectedFlower.level];

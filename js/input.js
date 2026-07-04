@@ -113,6 +113,8 @@ export function setupInput() {
     state.canvas.addEventListener('mousemove', e => {
         const p = screenToGame(e.clientX, e.clientY);
         state.mouseX = p.x;
+        state.lastMouseX = p.x;
+        state.lastMouseY = p.y;
         
         // Handle flower dragging
         if (state.isDragging && state.selectedFlower) {
@@ -175,6 +177,10 @@ export function setupInput() {
         if (clickedFlower) {
             state.selectedFlower = clickedFlower;
             state.isDragging = true;
+            // Disable gravity and make the flower kinematic when dragging starts
+            const flowerBody = clickedFlower.body;
+            flowerBody.gravityScale = 0;
+            state.Matter.Body.setStatic(flowerBody, true);
         } else {
             // If mouse is within vase area, start continuous dropping
             if (p.x >= CONFIG.VASE.l && p.x <= CONFIG.VASE.r && 
@@ -196,25 +202,49 @@ export function setupInput() {
 
     state.canvas.addEventListener('mouseup', e => {
         stopContinuousDrop(); // Stop continuous drop when mouse is released
-        // Stop dragging when mouse is released
-        if (state.isDragging && state.selectedFlower) {
-            // Check if the flower was dropped in the vase area
-            const flowerPos = state.selectedFlower.body.position;
-            if (flowerPos.x >= CONFIG.VASE.l && flowerPos.x <= CONFIG.VASE.r && 
-                flowerPos.y >= CONFIG.VASE.t && flowerPos.y <= CONFIG.VASE.b) {
-                // Flower is in the vase, keep it there
-                // You could add additional logic here if needed
-            } else {
-                // Flower is outside the vase, you might want to remove it or return it
-                // For now, we'll just stop dragging
+        // Stop dragging when mouse is released, but keep the flower selected
+        if (state.isDragging) {
+            // Re-enable gravity for the flower when dragging stops
+            if (state.selectedFlower) {
+                const flowerBody = state.selectedFlower.body;
+                const allFlowers = getAllFlowersWithGenerated();
+                const flowerData = allFlowers[state.selectedFlower.level];
+                const flowerRadius = flowerData.flowerType === 'orchid' ? flowerData.radius * 0.5 : flowerData.radius;
+                const avgRadius = allFlowers.slice(0, Math.min(8, allFlowers.length)).reduce((sum, f, i) => {
+                    const rad = f.flowerType === 'orchid' ? f.radius * 0.5 : f.radius;
+                    return sum + rad;
+                }, 0) / Math.min(8, allFlowers.length) || 40;
+                
+                const densityModifier = 1 + (flowerRadius - avgRadius) * CONFIG.GRAVITY_DENSITY_FACTOR / avgRadius;
+                flowerBody.gravityScale = densityModifier;
+                
+                // Restore the body to dynamic instead of static
+                state.Matter.Body.setStatic(flowerBody, false);
             }
+            state.isDragging = false;
         }
-        state.isDragging = false;
     });
 
     state.canvas.addEventListener('mouseleave', e => {
         stopContinuousDrop(); // Stop continuous drop when mouse leaves canvas
         if (state.isDragging) {
+            // Re-enable gravity if mouse leaves while dragging
+            if (state.selectedFlower) {
+                const flowerBody = state.selectedFlower.body;
+                const allFlowers = getAllFlowersWithGenerated();
+                const flowerData = allFlowers[state.selectedFlower.level];
+                const flowerRadius = flowerData.flowerType === 'orchid' ? flowerData.radius * 0.5 : flowerData.radius;
+                const avgRadius = allFlowers.slice(0, Math.min(8, allFlowers.length)).reduce((sum, f, i) => {
+                    const rad = f.flowerType === 'orchid' ? f.radius * 0.5 : f.radius;
+                    return sum + rad;
+                }, 0) / Math.min(8, allFlowers.length) || 40;
+                
+                const densityModifier = 1 + (flowerRadius - avgRadius) * CONFIG.GRAVITY_DENSITY_FACTOR / avgRadius;
+                flowerBody.gravityScale = densityModifier;
+                
+                // Restore the body to dynamic instead of static
+                state.Matter.Body.setStatic(flowerBody, false);
+            }
             state.isDragging = false;
         }
     });
@@ -235,6 +265,10 @@ export function setupInput() {
         if (touchedFlower) {
             state.selectedFlower = touchedFlower;
             state.isDragging = true;
+            // Disable gravity and make the flower kinematic when dragging starts
+            const flowerBody = touchedFlower.body;
+            flowerBody.gravityScale = 0;
+            state.Matter.Body.setStatic(flowerBody, true);
         } else {
             // If touching empty space within vase, deselect and start continuous drop
             if (p.x >= CONFIG.VASE.l && p.x <= CONFIG.VASE.r && 
@@ -274,6 +308,10 @@ export function setupInput() {
             const clampedY = clamp(p.y, CONFIG.VASE.t + radius, CONFIG.VASE.b - radius);
             
             state.Matter.Body.setPosition(flowerBody, { x: clampedX, y: clampedY });
+            // Ensure gravity is disabled while dragging
+            flowerBody.gravityScale = 0;
+            // Ensure the body remains kinematic during dragging
+            state.Matter.Body.setStatic(flowerBody, true);
             state.Matter.Body.setVelocity(flowerBody, { x: 0, y: 0 });
             state.Matter.Body.setAngularVelocity(flowerBody, 0);
         }
@@ -282,6 +320,24 @@ export function setupInput() {
     state.canvas.addEventListener('touchend', e => {
         e.preventDefault();
         stopContinuousDrop(); // Stop continuous drop on touch end
+        // Stop dragging when touch is released
+        if (state.isDragging && state.selectedFlower) {
+            // Re-enable gravity for the flower when dragging stops
+            const flowerBody = state.selectedFlower.body;
+            const allFlowers = getAllFlowersWithGenerated();
+            const flowerData = allFlowers[state.selectedFlower.level];
+            const flowerRadius = flowerData.flowerType === 'orchid' ? flowerData.radius * 0.5 : flowerData.radius;
+            const avgRadius = allFlowers.slice(0, Math.min(8, allFlowers.length)).reduce((sum, f, i) => {
+                const rad = f.flowerType === 'orchid' ? f.radius * 0.5 : f.radius;
+                return sum + rad;
+            }, 0) / Math.min(8, allFlowers.length) || 40;
+            
+            const densityModifier = 1 + (flowerRadius - avgRadius) * CONFIG.GRAVITY_DENSITY_FACTOR / avgRadius;
+            flowerBody.gravityScale = densityModifier;
+            
+            // Restore the body to dynamic instead of static
+            state.Matter.Body.setStatic(flowerBody, false);
+        }
         state.isDragging = false;
     }, { passive: false });
 

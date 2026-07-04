@@ -32,6 +32,12 @@ let perfMonitor = {
 };
 
 /** Initialize game with canvas, context, restart button, and Matter.js */
+// Main Game Logic — orchestrator module
+
+
+
+
+/** Initialize game with canvas, context, restart button, and Matter.js */
 export async function initGame(canvasEl, ctxEl, restartBtnEl, MatterLib) {
     state.canvas = canvasEl;
     state.ctx = ctxEl;
@@ -203,6 +209,11 @@ function createFlower(x, y, level) {
     flower.timeoutId = timeoutId;
     return flower;
 }
+
+export { createFlower };
+
+// Make createFlower function available globally
+window.createFlower = createFlower;
 
 function removeFlower(idx) {
     const f = state.flowers[idx];

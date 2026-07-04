@@ -234,16 +234,50 @@ export function setupInput() {
 
     state.canvas.addEventListener('mouseup', e => {
         stopContinuousDrop(); // Stop continuous drop when mouse is released
-        // Stop dragging when mouse is released, but keep the flower selected
-        if (state.isDragging) {
-            // Re-enable gravity for the flower when dragging stops
-            if (state.selectedFlower) {
-                const flowerBody = state.selectedFlower.body;
-                // Restore original gravity scale
-                flowerBody.gravityScale = state.selectedFlower.originalGravityScale || 1;
+        // Stop dragging when mouse is released
+        if (state.isDragging && state.selectedFlower) {
+            // Get the current flower that was being dragged
+            const flowerBeingDragged = state.selectedFlower;
+            const flowerBody = flowerBeingDragged.body;
+            
+            // Store the current rotation state before destroying the flower
+            const currentAngle = flowerBody.angle;
+            const currentAngularVelocity = flowerBody.angularVelocity;
+            
+            // Get flower properties
+            const level = flowerBeingDragged.level;
+            const position = { x: flowerBody.position.x, y: flowerBody.position.y };
+            
+            // Remove the old flower
+            const flowerIndex = state.flowers.indexOf(flowerBeingDragged);
+            if (flowerIndex !== -1) {
+                state.Matter.World.remove(state.world, flowerBody);
+                state.flowers[flowerIndex] = null;
+                
+                // Clean up the flowers array
+                state.flowers = state.flowers.filter(f => f !== null);
+                state.flowers.forEach((f, i) => { 
+                    if (f && f.body) {
+                        f.body.flowerIdx = i; 
+                    }
+                });
             }
-            state.isDragging = false;
+            
+            // Create a new flower at the same position with preserved rotation
+            const newFlower = window.createFlower(position.x, position.y, level);
+            if (newFlower) {
+                // Preserve the rotation state from the old flower
+                state.Matter.Body.setAngle(newFlower.body, currentAngle);
+                state.Matter.Body.setAngularVelocity(newFlower.body, currentAngularVelocity);
+                
+                // Make sure gravity is enabled for the new flower
+                newFlower.body.gravityScale = flowerBeingDragged.originalGravityScale || 1;
+                
+                // Ensure the new flower is not selected - this is crucial to prevent yellow circle
+                state.selectedFlower = null;
+            }
         }
+        state.isDragging = false;
     });
 
     state.canvas.addEventListener('mouseleave', e => {
@@ -334,10 +368,46 @@ export function setupInput() {
         stopContinuousDrop(); // Stop continuous drop on touch end
         // Stop dragging when touch is released
         if (state.isDragging && state.selectedFlower) {
-            // Re-enable gravity for the flower when dragging stops
-            const flowerBody = state.selectedFlower.body;
-            // Restore original gravity scale
-            flowerBody.gravityScale = state.selectedFlower.originalGravityScale || 1;
+            // Get the current flower that was being dragged
+            const flowerBeingDragged = state.selectedFlower;
+            const flowerBody = flowerBeingDragged.body;
+            
+            // Store the current rotation state before destroying the flower
+            const currentAngle = flowerBody.angle;
+            const currentAngularVelocity = flowerBody.angularVelocity;
+            
+            // Get flower properties
+            const level = flowerBeingDragged.level;
+            const position = { x: flowerBody.position.x, y: flowerBody.position.y };
+            
+            // Remove the old flower
+            const flowerIndex = state.flowers.indexOf(flowerBeingDragged);
+            if (flowerIndex !== -1) {
+                state.Matter.World.remove(state.world, flowerBody);
+                state.flowers[flowerIndex] = null;
+                
+                // Clean up the flowers array
+                state.flowers = state.flowers.filter(f => f !== null);
+                state.flowers.forEach((f, i) => { 
+                    if (f && f.body) {
+                        f.body.flowerIdx = i; 
+                    }
+                });
+            }
+            
+            // Create a new flower at the same position with preserved rotation
+            const newFlower = window.createFlower(position.x, position.y, level);
+            if (newFlower) {
+                // Preserve the rotation state from the old flower
+                state.Matter.Body.setAngle(newFlower.body, currentAngle);
+                state.Matter.Body.setAngularVelocity(newFlower.body, currentAngularVelocity);
+                
+                // Make sure gravity is enabled for the new flower
+                newFlower.body.gravityScale = flowerBeingDragged.originalGravityScale || 1;
+                
+                // Ensure the new flower is not selected - this is crucial to prevent yellow circle
+                state.selectedFlower = null;
+            }
         }
         state.isDragging = false;
     }, { passive: false });

@@ -470,12 +470,22 @@ function performMerge(fa, fb, idxA, idxB) {
     const my = (fa.body.position.y + fb.body.position.y) / 2;
     const newLevel = fa.level + 1;
 
+    // Check if either of the flowers being merged is currently selected
+    const wasSelected = (state.selectedFlower === fa || state.selectedFlower === fb);
+
     removeFlower(idxA);
     removeFlower(idxB);
 
     const nf = createFlower(mx, my, newLevel);
     nf.spawning = true;
     nf.mergeGlow = 1;
+
+    // If one of the merged flowers was selected, select the new flower
+    if (wasSelected) {
+        state.selectedFlower = nf;
+        // Set isDragging to true so the player can continue moving the flower
+        state.isDragging = true;
+    }
 
     visualEffects.createMergeEffect(mx, my, newLevel);
     state.shake.trigger(6 + newLevel * 2);

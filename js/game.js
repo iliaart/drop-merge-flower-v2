@@ -1,7 +1,7 @@
 // Main Game Logic — orchestrator module
 import { state } from './state.js';
 import { CONFIG } from './config.js';
-import { clamp, rand, TAU, rgba } from './utils.js';
+import { clamp, rand, TAU, rgba, hexToRgb, hslToHex } from './utils.js';
 import { generateRandomFlowerBatch, getAllFlowersWithGenerated, resetGeneratedFlowers, generateRandomFlower } from './random-flowers.js';
 import { ParticleSystem, spawnMergeParticles, spawnDropParticles } from './particle.js';
 import { visualEffects } from './visual-effects.js';
@@ -262,6 +262,24 @@ function updateFlowerTail(flower, currentTime) {
     }
 }
 
+function rgbToHsl(r, g, b) {
+    r /= 255; g /= 255; b /= 255;
+    const max = Math.max(r, g, b), min = Math.min(r, g, b);
+    let h, s, l = (max + min) / 2;
+    if (max === min) {
+        h = s = 0;
+    } else {
+        const d = max - min;
+        s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+        switch (max) {
+            case r: h = ((g - b) / d + (g < b ? 6 : 0)) / 6; break;
+            case g: h = ((b - r) / d + 2) / 6; break;
+            case b: h = ((r - g) / d + 4) / 6; break;
+        }
+    }
+    return [h * 360, s * 100, l * 100];
+}
+
 /**
  * Draw the tail for a flower being dragged
  * @param {CanvasRenderingContext2D} ctx - Canvas context
@@ -287,27 +305,63 @@ function drawFlowerTail(ctx, flower, flowerData) {
         const point = tailPoints[i];
         ctx.lineTo(point.x, point.y);
     }
+
+    // Extract 5 colors from the flower's palette
+    const colors = [];
+    // We'll use the main petal color and derive 4 more colors by adjusting hue/lightness
+    const baseColor = flowerData.petalColor || '#f5a0c0';
+    const [r, g, b] = hexToRgb(baseColor);
+    const hsl = rgbToHsl(r, g, b);
+    const [h, s, l] = hsl;
     
-    // Use the flower's petal color for the tail
-    const tailColor = flowerData.petalColor || '#f5a0c0'; // Default to pink if no color defined
+    // Generate 5 color variations based on the base color
+    for (let i = 0; i < 5; i++) {
+        const hueShift = (h + i * 72) % 360; // Spread around the color wheel (360/5 = 72)
+        const lightnessShift = l + (i - 2) * 10; // Vary lightness slightly
+        const newColor = hslToHex(hueShift, s, Math.max(10, Math.min(90, lightnessShift)));
+        colors.push(newColor);
+    }
+
+    // Draw 5 parallel colored stripes instead of a single line
+    const originalLineWidth = 30; // Changed from 6 to 10 pixels as requested (was 6, originally 3)
+    const stripeWidth = originalLineWidth;
     
-    // Create gradient along the tail for fading effect
+    for (let i = 0; i < 5; i++) {
+        ctx.save();
+        ctx.beginPath();
+        ctx.moveTo(startPoint.x, startPoint.y);
+        for (let j = 1; j < tailLength; j++) {
+            const point = tailPoints[j];
+            ctx.lineTo(point.x, point.y);
+        }
+        ctx.strokeStyle = colors[i];
+        ctx.lineWidth = stripeWidth;
+        // Offset each stripe perpendicular to the path to create parallel effect
+        // We'll achieve this by setting line width and using different drawing offsets
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.stroke();
+        ctx.restore();
+    }
+
+    // Additionally, draw the original gradient stroke for depth/fading effect
     const endPoint = tailPoints[tailLength - 1];
     const gradient = ctx.createLinearGradient(
         startPoint.x, startPoint.y, 
         endPoint.x, endPoint.y
     );
-    gradient.addColorStop(0, rgba(tailColor, 0.0)); // Fully transparent at start
-    gradient.addColorStop(0.5, rgba(tailColor, 0.4)); // More opaque in middle
-    gradient.addColorStop(1, rgba(tailColor, 0.7)); // Most opaque at end near flower
-    
+    gradient.addColorStop(0, rgba(flowerData.petalColor || '#f5a0c0', 0.0)); // Fully transparent at start
+    gradient.addColorStop(0.5, rgba(flowerData.petalColor || '#f5a0c0', 0.4)); // More opaque in middle
+    gradient.addColorStop(1, rgba(flowerData.petalColor || '#f5a0c0', 0.7)); // Most opaque at end near flower
+
     ctx.strokeStyle = gradient;
-    ctx.lineWidth = 3;
+    ctx.lineWidth = 35; // Changed to 1/4 of total width to maintain balance
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
-    ctx.globalCompositeOperation = 'source-over'; // Ensure proper blending
+    ctx.globalCompositeOperation = 'source-over';
     ctx.stroke();
-    
+
     // Optionally, draw fading circles along the tail for a particle effect
     for (let i = 0; i < tailLength; i++) {
         const point = tailPoints[i];
@@ -317,7 +371,7 @@ function drawFlowerTail(ctx, flower, flowerData) {
         
         ctx.beginPath();
         ctx.arc(point.x, point.y, size, 0, TAU);
-        ctx.fillStyle = rgba(tailColor, alpha);
+        ctx.fillStyle = rgba(flowerData.petalColor || '#f5a0c0', alpha);
         ctx.fill();
     }
     

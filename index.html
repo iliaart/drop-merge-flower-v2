@@ -61,10 +61,49 @@
             border-radius: 15px;
             z-index: 10;
         }
+        /* Loading spinner styles */
+        #loadingOverlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(26, 21, 32, 0.9);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+            transition: opacity 0.5s ease-out;
+        }
+        .spinner {
+            width: 60px;
+            height: 60px;
+            border: 5px solid rgba(255, 255, 255, 0.1);
+            border-top: 5px solid #e8b4b8;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 20px;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        #loadingText {
+            color: #ffffff;
+            font-size: 18px;
+            font-family: inherit;
+            text-align: center;
+            margin-top: 10px;
+        }
     </style>
 </head>
 <body>
     <canvas id="game"></canvas>
+    <div id="loadingOverlay">
+        <div class="spinner"></div>
+        <div id="loadingText">🌺 Генерация цветов...</div>
+    </div>
     <button id="restart">Начать заново</button>
     <div id="flowerCount"></div>
 
@@ -146,6 +185,9 @@
         }
 
         function startGame() {
+            // Hide loading overlay after game starts regardless of outcome
+            document.getElementById('loadingOverlay').style.display = 'none';
+            
             if (typeof Matter !== 'undefined') {
                 // Pass performance config to game initialization
                 window.PERFORMANCE_CONFIG = {
@@ -164,7 +206,8 @@
 
         // Initialize the game with only generated flowers
         async function boot() {
-            flowerCountDiv.textContent = '🌺 Генерация цветов...';
+            // Show loading overlay
+            document.getElementById('loadingOverlay').style.display = 'flex';
             
             // Clear any existing generated flowers and generate new ones
             resetGeneratedFlowers();

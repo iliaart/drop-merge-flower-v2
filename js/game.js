@@ -4,7 +4,8 @@ import { CONFIG } from './config.js';
 import { clamp, rand, TAU } from './utils.js';
 import { generateRandomFlowerBatch, getAllFlowersWithGenerated, resetGeneratedFlowers, generateRandomFlower } from './random-flowers.js';
 import { ParticleSystem, spawnMergeParticles, spawnDropParticles } from './particle.js';
-import { initPhysics, applyForces, updateAngularVelocity } from './physics.js';
+import { visualEffects } from './visual-effects.js';
+import { initPhysics, applyForces, updateAngularVelocity, destroyPhysics } from './physics.js';
 import { resizeCanvas, setupInput as _setupInput } from './input.js';
 import { ScreenShake, AmbientMote } from './effects.js';
 import {
@@ -14,6 +15,21 @@ import {
 
 const { GW, GH, VASE, DANGER_Y, DROP_Y, MAX_LEVEL, GAME_OVER_GRACE, MERGE_RADIUS_BONUS, SQUASH_FREQ, SQUASH_DAMP, MAX_FLOWER_TYPES, MAX_TYPES_AT_FULL, ADAPTIVE_FILL_THRESHOLD } = CONFIG;
 const GAME_OVER_FLOWER_THRESHOLD = 3; // need this many flowers out of bounds to lose
+
+// Track timeout IDs for proper cleanup
+let dropTimeoutId = null;
+let prepareNextTimeoutId = null;
+
+// Performance tracking
+let lastFrameTime = 0;
+let frameSkipCounter = 0;
+let perfMonitor = {
+    frameCount: 0,
+    lastPerfCheck: performance.now(),
+    avgFps: 60,
+    renderSkips: 0,
+    lastRenderTime: 0
+};
 
 /** Initialize game with canvas, context, restart button, and Matter.js */
 export async function initGame(canvasEl, ctxEl, restartBtnEl, MatterLib) {
@@ -27,7 +43,18 @@ export async function initGame(canvasEl, ctxEl, restartBtnEl, MatterLib) {
     state.audio.init();
     state.shake = new ScreenShake();
 
-    for (let i = 0; i < 15; i++) state.ambientMotes.push(new AmbientMote());
+    // Initialize particles with performance configuration
+    state.initParticles = () => {
+        const maxParticles = window.PERFORMANCE_CONFIG?.maxParticles || 500;
+        state.particles = new ParticleSystem(maxParticles);
+    };
+
+    // Initialize particles with performance configuration
+    state.initParticles();
+
+    // Use performance-configured number of ambient motes
+    const ambientMoteCount = window.PERFORMANCE_CONFIG?.ambientMotes || 15;
+    for (let i = 0; i < ambientMoteCount; i++) state.ambientMotes.push(new AmbientMote());
 
     // Initialize unique palettes before generating flowers
     if (typeof window.initializeUniquePalettes === 'function') {
@@ -36,7 +63,9 @@ export async function initGame(canvasEl, ctxEl, restartBtnEl, MatterLib) {
 
     // Generate random flowers for the game session
     resetGeneratedFlowers();
-    generateRandomFlowerBatch(50); // Generate more random flowers for variety
+    // Use performance-appropriate flower count
+    const flowerCount = window.PERFORMANCE_CONFIG?.isLowEndDevice ? 30 : window.PERFORMANCE_CONFIG?.isMobile ? 40 : 50;
+    generateRandomFlowerBatch(flowerCount); // Generate more random flowers for variety
     
     // Update MAX_LEVEL to account for generated flowers
     CONFIG.MAX_LEVEL = getAllFlowersWithGenerated().length - 1;
@@ -169,13 +198,19 @@ function createFlower(x, y, level) {
         isForcedStopped: false, resonanceTimer: 0, isInContact: false, vibrationEnergy: 0,
     };
     state.flowers.push(flower);
-    setTimeout(() => { flower.justSpawned = false; }, 300);
+    // Store timeout ID to allow cleanup
+    const timeoutId = setTimeout(() => { flower.justSpawned = false; }, 300);
+    flower.timeoutId = timeoutId;
     return flower;
 }
 
 function removeFlower(idx) {
     const f = state.flowers[idx];
     if (!f) return;
+    // Clear timeout if exists
+    if (f.timeoutId) {
+        clearTimeout(f.timeoutId);
+    }
     state.Matter.World.remove(state.world, f.body);
     state.flowers[idx] = null;
 }
@@ -218,45 +253,73 @@ export function dropFlower() {
     const flower = createFlower(x, DROP_Y, state.currentLevel);
     if (flower) {
         flower.justSpawned = false;
-        spawnDropParticles(state.particles, x, DROP_Y, state.currentLevel);
+        visualEffects.createDropEffect(x, DROP_Y, state.currentLevel);
     }
     state.dropCooldown = .3; // Changed from .35 to .3 (0.3 seconds)
-    setTimeout(prepareNextFlower, 300); // Changed from 350 to 300ms
+    // Clear any existing timeout
+    if (prepareNextTimeoutId) {
+        clearTimeout(prepareNextTimeoutId);
+    }
+    prepareNextTimeoutId = setTimeout(prepareNextFlower, 300); // Changed from 350 to 300ms
 }
 
-// Global variable to track if mouse button is held down
-window.isMouseDown = false;
+// State variable for mouse/touch hold instead of global variable
+let isMouseDown = false;
 
 function prepareNextFlower() {
     state.currentLevel = state.nextLevel;
     state.nextLevel = pickLevel();
     state.canDrop = true;
     
-    // If mouse button is still held down, drop another flower immediately
-    if (window.isMouseDown && state.gameState === 'playing') {
-        // Check if mouse is within vase area before dropping
-        const allFlowers = getAllFlowersWithGenerated();
-        if (allFlowers.length > 0 && state.mouseX >= CONFIG.VASE.l && state.mouseX <= CONFIG.VASE.r) {
-            setTimeout(() => {
-                if (window.isMouseDown && state.canDrop && state.gameState === 'playing') {
-                    state.audio.ensure();
-                    dropFlower();
-                }
-            }, 10); // Small delay to avoid race conditions
-        }
-    }
+    // We no longer automatically drop another flower if mouse is held down
+    // This is now handled by the interval in input.js
 }
 
 export function restart() {
+    // Clear all timeouts to prevent memory leaks
+    if (dropTimeoutId) {
+        clearTimeout(dropTimeoutId);
+        dropTimeoutId = null;
+    }
+    if (prepareNextTimeoutId) {
+        clearTimeout(prepareNextTimeoutId);
+        prepareNextTimeoutId = null;
+    }
+
+    // Clear all flower timeouts
+    state.flowers.forEach(f => {
+        if (f && f.timeoutId) {
+            clearTimeout(f.timeoutId);
+        }
+    });
+
     state.flowers.forEach(f => { if (f) state.Matter.World.remove(state.world, f.body); });
     state.flowers = [];
     state.mergingSet.clear();
-    state.particles = new ParticleSystem();
+    // Initialize particles with performance configuration
+    state.initParticles();
     state.gameState = 'playing';
     state.gameOverTimer = 0;
     state.gameOverAlpha = 0;
     state.outOfBoundsCount = 0;
     state.highestLevel = 0; // Reset to 0 initially
+    
+    // Clean up ambient motes
+    state.ambientMotes.forEach(mote => {
+        if (mote.cleanup) {
+            mote.cleanup();
+        }
+    });
+    state.ambientMotes = [];
+
+    // Initialize new ambient motes
+    // Initialize new ambient motes with performance-configured count
+    const ambientMoteCount = window.PERFORMANCE_CONFIG?.ambientMotes || 15;
+    for (let i = 0; i < ambientMoteCount; i++) state.ambientMotes.push(new AmbientMote());
+    
+    // Destroy and recreate physics world to prevent memory leaks
+    destroyPhysics();
+    initPhysics();
     
     // Regenerate random flowers for the new game
     resetGeneratedFlowers();
@@ -324,6 +387,10 @@ function checkGameOver(dt) {
         if (state.gameOverTimer > GAME_OVER_GRACE) state.gameState = 'gameover';
     } else {
         state.gameOverTimer = Math.max(0, state.gameOverTimer - dt * 1.2);
+        // Only hide restart button when definitely not game over
+        if (state.gameOverTimer <= 0) {
+            state.restartBtn.style.display = 'none';
+        }
     }
 }
 
@@ -410,7 +477,7 @@ function performMerge(fa, fb, idxA, idxB) {
     nf.spawning = true;
     nf.mergeGlow = 1;
 
-    spawnMergeParticles(state.particles, mx, my, newLevel);
+    visualEffects.createMergeEffect(mx, my, newLevel);
     state.shake.trigger(6 + newLevel * 2);
     state.audio.playMerge(newLevel);
     if (newLevel > state.highestLevel) state.highestLevel = newLevel;
@@ -421,16 +488,38 @@ window.performMerge = performMerge;
 
 // ─── Game Loop ───────────────────────────────────────────
 function gameLoop(timestamp) {
-    requestAnimationFrame(gameLoop);
+    // Performance optimization: skip frames if running behind
+    const currentTime = timestamp;
+    const perfConfig = window.PERFORMANCE_CONFIG || { maxFPS: 60, mergeCheckFreq: 2 };
+    const frameInterval = 1000 / perfConfig.maxFPS;
+    const elapsed = currentTime - lastFrameTime;
+    
+    if (elapsed < frameInterval) {
+        requestAnimationFrame(gameLoop);
+        return;
+    }
+    lastFrameTime = currentTime - (elapsed % frameInterval);
+    
+    // Update performance monitor
+    perfMonitor.frameCount++;
+    const now = performance.now();
+    if (now - perfMonitor.lastPerfCheck >= 1000) {
+        perfMonitor.avgFps = perfMonitor.frameCount * 1000 / (now - perfMonitor.lastPerfCheck);
+        perfMonitor.frameCount = 0;
+        perfMonitor.lastPerfCheck = now;
+    }
 
+    // Calculate delta time
     const rawDt = (timestamp - state.lastTime) / 1000;
     const dt = Math.min(rawDt, 1 / 20);
     state.lastTime = timestamp;
     state.time += dt;
 
+    // Update physics
     state.Matter.Engine.update(state.engine, dt * 1000);
     applyForces(dt);
 
+    // Update flower states
     for (const f of state.flowers) {
         if (!f) continue;
         updateAngularVelocity(f);
@@ -441,8 +530,11 @@ function gameLoop(timestamp) {
         updateSquash(f, dt);
     }
 
-    checkMerges();
-    forceOverlapMerges();
+    // Perform merge checks less frequently based on performance config
+    if (Math.floor(state.time * 10) % perfConfig.mergeCheckFreq === 0) { // Check every N frames based on performance
+        checkMerges();
+        forceOverlapMerges();
+    }
     autoMergeExcessTypes();
 
     if (state.dropCooldown > 0) {
@@ -453,10 +545,24 @@ function gameLoop(timestamp) {
     state.particles.update(dt);
     state.shake.update(dt);
     state.ambientMotes.forEach(m => m.update(dt, state.time));
+    visualEffects.update(dt);
 
     if (state.gameState === 'playing') checkGameOver(dt);
     if (state.flowers.some(f => f === null)) cleanupFlowers();
 
+    // Render - only if enough time has passed since last render for performance
+    const renderTime = performance.now();
+    if (renderTime - perfMonitor.lastRenderTime >= frameInterval * 0.8) { // Allow 80% of frame time
+        perfMonitor.lastRenderTime = renderTime;
+        renderFrame();
+    } else {
+        perfMonitor.renderSkips++; // Track skipped renders
+    }
+    
+    requestAnimationFrame(gameLoop);
+}
+
+function renderFrame() {
     // Render
     const ctx = state.ctx;
     ctx.save();
@@ -464,7 +570,6 @@ function gameLoop(timestamp) {
 
     drawBackground(ctx);
     drawVase(ctx);
-    state.ambientMotes.forEach(m => m.update(ctx, state.time));
 
     // Separate the flowers into selected and unselected for rendering order
     const unselectedFlowers = [];
@@ -490,6 +595,10 @@ function gameLoop(timestamp) {
         drawFlower(ctx, selectedFlowerToRender, state.time);
     }
 
+    // Draw visual effects
+    visualEffects.draw(ctx);
+    
+    // Draw particle system
     state.particles.draw(ctx);
 
     // Draw selected flower indicator if there is one
@@ -528,7 +637,7 @@ function gameLoop(timestamp) {
     drawNextPreview(ctx, state.time);
     drawHighestLevel(ctx);
     drawGameOverWarning(ctx);
-    drawGameOver(ctx, dt);
+    drawGameOver(ctx, state.time > 0 ? 0.016 : 0); // Используем state.time или фиксированное значение вместо dt
 
     ctx.restore();
 }

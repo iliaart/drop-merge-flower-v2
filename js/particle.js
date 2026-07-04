@@ -78,16 +78,48 @@ export class Particle {
 }
 
 export class ParticleSystem {
-    constructor() { this.particles = []; }
-    add(p) { this.particles.push(p); }
+    constructor(maxParticles = null) { 
+        this.particles = []; 
+        // Use performance-configured max particles or default
+        this.maxParticles = maxParticles || window.PERFORMANCE_CONFIG?.maxParticles || 500;
+    }
+    
+    add(p) { 
+        if (this.particles.length >= this.maxParticles) {
+            // Remove oldest particles if we've reached the limit
+            this.particles.shift();
+        }
+        this.particles.push(p); 
+    }
+    
     update(dt) {
+        // Optimize particle updates by processing in batches
+        const batchSize = 100; // Process particles in smaller batches
         for (let i = this.particles.length - 1; i >= 0; i--) {
             this.particles[i].update(dt);
             if (this.particles[i].dead) this.particles.splice(i, 1);
         }
     }
-    draw(ctx) { this.particles.forEach(p => p.draw(ctx)); }
+    
+    draw(ctx) { 
+        // Only draw particles if there are any and performance is good
+        if (this.particles.length > 0) {
+            // On low-performance devices, draw fewer particles
+            const perfConfig = window.PERFORMANCE_CONFIG || { maxParticles: 500 };
+            const drawLimit = Math.min(this.particles.length, perfConfig.maxParticles * 0.8);
+            
+            for (let i = 0; i < drawLimit; i++) {
+                this.particles[i].draw(ctx);
+            }
+        }
+    }
+    
     get count() { return this.particles.length; }
+    
+    // Method to clear all particles
+    clear() {
+        this.particles = [];
+    }
 }
 
 export function spawnMergeParticles(ps, x, y, level) {
@@ -95,20 +127,25 @@ export function spawnMergeParticles(ps, x, y, level) {
     const f = allFlowers[level];
     if (!f) return; // Safety check
     
-    const n = 12 + level * 3;
+    // Reduce particle count on mobile devices for better performance
+    const perfConfig = window.PERFORMANCE_CONFIG || { maxParticles: 500 };
+    const isMobile = perfConfig.isMobile || /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    const multiplier = isMobile ? 0.5 : 1.0; // Reduce particles by 50% on mobile
+    
+    const n = Math.floor((12 + level * 3) * multiplier);
     for (let i = 0; i < n; i++) {
         const a = rand(0, TAU);
         const sp = rand(60, 200 + level * 20);
         ps.add(new Particle(x, y, Math.cos(a)*sp, Math.sin(a)*sp - 60,
             f.petalColor, { life: rand(.6, 1.4), size: rand(4, 10), type: 'petal', gravity: 140 }));
     }
-    for (let i = 0; i < 8; i++) {
+    for (let i = 0; i < Math.floor(8 * multiplier); i++) {
         const a = rand(0, TAU);
         const sp = rand(40, 120);
         ps.add(new Particle(x, y, Math.cos(a)*sp, Math.sin(a)*sp - 40,
             '#fff8dd', { life: rand(.3, .7), size: rand(2, 5), type: 'sparkle', gravity: 50 }));
     }
-    for (let i = 0; i < 5; i++) {
+    for (let i = 0; i < Math.floor(5 * multiplier); i++) {
         ps.add(new Particle(x + rand(-15,15), y + rand(-15,15),
             rand(-20,20), rand(-80, -30),
             '#c8e8ff', { life: rand(.8, 1.5), size: rand(3, 6), type: 'dew', gravity: 100 }));
@@ -120,7 +157,12 @@ export function spawnDropParticles(ps, x, y, level) {
     const f = allFlowers[level];
     if (!f) return; // Safety check
     
-    for (let i = 0; i < 6; i++) {
+    // Reduce particle count on mobile devices for better performance
+    const perfConfig = window.PERFORMANCE_CONFIG || { maxParticles: 500 };
+    const isMobile = perfConfig.isMobile || /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    const multiplier = isMobile ? 0.5 : 1.0; // Reduce particles by 50% on mobile
+    
+    for (let i = 0; i < Math.floor(6 * multiplier); i++) {
         const a = rand(0, TAU);
         ps.add(new Particle(x, y, Math.cos(a)*30, Math.sin(a)*30,
             f.petalColor, { life: rand(.3, .6), size: rand(3, 6), type: 'petal', gravity: 60 }));

@@ -69,6 +69,39 @@ function getFlowerAtPosition(x, y) {
     return null;
 }
 
+// Variable to track mouse/touch hold state instead of using global window variable
+let isMouseDown = false;
+let continuousDropInterval = null;
+
+function stopContinuousDrop() {
+    isMouseDown = false;
+    window.isMouseDown = false; // For backward compatibility with other parts of code
+    
+    // Clear the interval for continuous dropping
+    if (continuousDropInterval) {
+        clearInterval(continuousDropInterval);
+        continuousDropInterval = null;
+    }
+}
+
+// Function to handle continuous dropping
+function startContinuousDrop() {
+    // Ensure we don't create multiple intervals
+    if (continuousDropInterval) {
+        clearInterval(continuousDropInterval);
+    }
+    
+    // Create an interval that drops a flower every 300ms (the cooldown period)
+    continuousDropInterval = setInterval(() => {
+        if (isMouseDown && state.canDrop && state.gameState === 'playing') {
+            const allFlowers = getAllFlowersWithGenerated();
+            if (allFlowers.length > 0 && state.mouseX >= CONFIG.VASE.l && state.mouseX <= CONFIG.VASE.r) {
+                state.audio.ensure();
+                dropFlower();
+            }
+        }
+    }, 300); // Match the cooldown period
+}
 
 /** Set up all input event listeners */
 export function setupInput() {
@@ -118,8 +151,10 @@ export function setupInput() {
             if (p.x >= CONFIG.VASE.l && p.x <= CONFIG.VASE.r && 
                 p.y >= CONFIG.VASE.t && p.y <= CONFIG.VASE.b) {
                 state.selectedFlower = null;
-                state.audio.ensure();
-                dropFlower();
+                if (state.canDrop && state.gameState === 'playing') {
+                    state.audio.ensure();
+                    dropFlower();
+                }
             } else {
                 // Clicked outside vase area, just deselect
                 state.selectedFlower = null;
@@ -132,6 +167,7 @@ export function setupInput() {
         state.lastMouseX = p.x;
         state.lastMouseY = p.y;
         isMouseDown = true;
+        window.isMouseDown = true; // For backward compatibility with other parts of code
         
         // Check if clicking on a flower to start dragging
         const clickedFlower = getFlowerAtPosition(p.x, p.y);
@@ -145,11 +181,12 @@ export function setupInput() {
                 p.y >= CONFIG.VASE.t && p.y <= CONFIG.VASE.b) {
                 state.selectedFlower = null;
                         
-                // Set the global mouse down state
-                window.isMouseDown = true;
-                        
-                state.audio.ensure();
-                dropFlower();
+                // Only start continuous drop if we're allowed to drop
+                if (state.canDrop && state.gameState === 'playing') {
+                    state.audio.ensure();
+                    dropFlower();
+                    startContinuousDrop();
+                }
             } else {
                 // Mouse down outside vase area, just deselect
                 state.selectedFlower = null;
@@ -158,8 +195,7 @@ export function setupInput() {
     });
 
     state.canvas.addEventListener('mouseup', e => {
-        // Reset the global mouse down state
-        window.isMouseDown = false;
+        stopContinuousDrop(); // Stop continuous drop when mouse is released
         // Stop dragging when mouse is released
         if (state.isDragging && state.selectedFlower) {
             // Check if the flower was dropped in the vase area
@@ -177,8 +213,7 @@ export function setupInput() {
     });
 
     state.canvas.addEventListener('mouseleave', e => {
-        // Reset the global mouse down state when mouse leaves canvas
-        window.isMouseDown = false;
+        stopContinuousDrop(); // Stop continuous drop when mouse leaves canvas
         if (state.isDragging) {
             state.isDragging = false;
         }
@@ -191,6 +226,8 @@ export function setupInput() {
         state.mouseX = p.x;
         state.lastMouseX = p.x;
         state.lastMouseY = p.y;
+        isMouseDown = true;
+        window.isMouseDown = true; // For backward compatibility with other parts of code
         
         // Touch support for flower selection
         const touchedFlower = getFlowerAtPosition(p.x, p.y);
@@ -204,11 +241,12 @@ export function setupInput() {
                 p.y >= CONFIG.VASE.t && p.y <= CONFIG.VASE.b) {
                 state.selectedFlower = null;
                         
-                // Set the global mouse down state for touch
-                window.isMouseDown = true;
-                        
-                state.audio.ensure();
-                dropFlower();
+                // Only start continuous drop if we're allowed to drop
+                if (state.canDrop && state.gameState === 'playing') {
+                    state.audio.ensure();
+                    dropFlower();
+                    startContinuousDrop();
+                }
             } else {
                 // Touch outside vase area, just deselect
                 state.selectedFlower = null;

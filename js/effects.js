@@ -6,7 +6,12 @@ const { VASE } = CONFIG;
 
 export class ScreenShake {
     constructor() { this.intensity = 0; this.x = 0; this.y = 0; }
-    trigger(amount) { this.intensity = Math.max(this.intensity, amount); }
+    trigger(amount) { 
+        // Scale shake intensity based on performance
+        const perfConfig = window.PERFORMANCE_CONFIG || { maxFPS: 60 };
+        const intensityScale = perfConfig.maxFPS > 45 ? 1.0 : perfConfig.maxFPS > 30 ? 0.7 : 0.4;
+        this.intensity = Math.max(this.intensity, amount * intensityScale); 
+    }
     update(dt) {
         if (this.intensity > .5) {
             this.x = (Math.random() - .5) * this.intensity * 2;
@@ -33,12 +38,20 @@ export class AmbientMote {
         this.phase = rand(0, TAU);
     }
     update(dt, time) {
-        this.x += (this.vx + Math.sin(time + this.phase) * 3) * dt;
-        this.y += this.vy * dt;
+        // On low-performance devices, reduce calculation frequency
+        const perfConfig = window.PERFORMANCE_CONFIG || { maxFPS: 60 };
+        const calcFreq = perfConfig.maxFPS > 30 ? 1 : 0.7; // Reduce calculations on low-end devices
+        
+        this.x += (this.vx + Math.sin(time + this.phase) * 3) * dt * calcFreq;
+        this.y += this.vy * dt * calcFreq;
         this.life -= dt;
         if (this.life <= 0 || this.y < VASE.t - 10) this.reset();
     }
     draw(ctx, time) {
+        // Early exit for low-performance devices
+        const perfConfig = window.PERFORMANCE_CONFIG || { maxFPS: 60 };
+        if (perfConfig.maxFPS < 25) return; // Skip drawing if FPS is very low
+        
         const fade = Math.min(1, this.life / (this.maxLife * .3));
         const a = this.alpha * fade;
         if (a < .01) return;
@@ -49,5 +62,10 @@ export class AmbientMote {
         g.addColorStop(1, `rgba(255,255,230,0)`);
         ctx.fillStyle = g;
         ctx.beginPath(); ctx.arc(this.x, this.y, s, 0, TAU); ctx.fill();
+    }
+    // Метод для очистки ресурсов при перезапуске игры
+    cleanup() {
+        // В этом классе нет ресурсов, требующих специальной очистки
+        // Но если бы были, например, ссылки на DOM-элементы или таймеры, их следовало бы освободить здесь
     }
 }

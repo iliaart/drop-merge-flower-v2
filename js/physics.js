@@ -30,6 +30,25 @@ export function initPhysics() {
     Events.on(state.engine, 'collisionStart', onCollision);
 }
 
+/** Destroy and clean up the physics world */
+export function destroyPhysics() {
+    if (state.Matter && state.engine && state.world) {
+        const { World, Engine, Events } = state.Matter;
+        
+        // Remove all collision event listeners
+        Events.off(state.engine, 'collisionStart', onCollision);
+        
+        // Remove all bodies from the world
+        World.clear(state.world, false);
+        
+        // Clear the engine
+        Engine.clear(state.engine);
+        
+        // Clean up state variables
+        state.walls = [];
+    }
+}
+
 /** Handle collision events — merging + repulsion */
 function onCollision(event) {
     if (state.gameState !== 'playing') return;
@@ -52,6 +71,10 @@ function onCollision(event) {
     });
 
     // Phase 2: smooth repulsion for non-merging flower collisions
+    // On low-performance devices, skip some repulsion calculations
+    const perfConfig = window.PERFORMANCE_CONFIG || { maxFPS: 60 };
+    if (perfConfig.maxFPS < 30 && Math.random() > 0.7) return; // Skip 30% of repulsion calcs on very low-end devices
+
     event.pairs.forEach(pair => {
         const a = pair.bodyA, b = pair.bodyB;
         if (a.flowerIdx === undefined || b.flowerIdx === undefined) return;
@@ -98,6 +121,12 @@ function applyRepulsionWithRadii(a, b, fa, fb, radiusA, radiusB) {
 
     const sharpOverlap = Math.pow(overlap, 2);
     let repulsionStrength = Math.min(sharpOverlap * 0.35 * avgDamping, 0.5);
+
+    // On low-performance devices, reduce repulsion force
+    const perfConfig = window.PERFORMANCE_CONFIG || { maxFPS: 60 };
+    if (perfConfig.maxFPS < 30) {
+        repulsionStrength *= 0.7; // Reduce repulsion force on low-end devices
+    }
 
     state.Matter.Body.applyForce(a, a.position, { x: -nx * repulsionStrength, y: -ny * repulsionStrength });
     state.Matter.Body.applyForce(b, b.position, { x: nx * repulsionStrength, y: ny * repulsionStrength });
@@ -157,8 +186,16 @@ export function applyForces(dt) {
     }
     const avgRadius = count > 0 ? totalRadius / count : 40;
 
+    // On low-performance devices, update fewer flowers per frame
+    const perfConfig = window.PERFORMANCE_CONFIG || { maxFPS: 60 };
+    const updateFrequency = perfConfig.maxFPS > 30 ? 1 : 0.8; // Update fewer flowers on low-end devices
+
     for (const f of state.flowers) {
         if (!f) continue;
+        
+        // Skip some updates on low-performance devices
+        if (Math.random() > updateFrequency) continue;
+
         const body = f.body;
         const flowerData = allFlowers[f.level];
         const flowerRadius = flowerData.flowerType === 'orchid' ? flowerData.radius * 0.5 : flowerData.radius;
@@ -222,6 +259,10 @@ function updateResonance(f, body, dt, speed, angSpeed) {
 }
 
 function applyVibrationBuoyancy(f, body, flowerRadius, avgRadius) {
+    // On low-performance devices, skip vibration calculations
+    const perfConfig = window.PERFORMANCE_CONFIG || { maxFPS: 60 };
+    if (perfConfig.maxFPS < 35) return; // Skip vibration calculations on low-end devices
+
     let vibrationForce = 0;
     for (const other of state.flowers) {
         if (!other || other === f) continue;
@@ -253,7 +294,10 @@ export function updateAngularVelocity(f) {
         state.Matter.Body.setAngularVelocity(body, body.velocity.x * 0.001);
     }
     if (Math.abs(currentAngVel) > angVelThreshold) {
-        state.Matter.Body.setAngularVelocity(body, currentAngVel * 0.97);
+        // On low-performance devices, increase damping
+        const perfConfig = window.PERFORMANCE_CONFIG || { maxFPS: 60 };
+        const dampingFactor = perfConfig.maxFPS > 30 ? 0.97 : 0.94; // More damping on low-end devices
+        state.Matter.Body.setAngularVelocity(body, currentAngVel * dampingFactor);
     } else if (speed < 0.5) {
         state.Matter.Body.setAngularVelocity(body, 0);
     }

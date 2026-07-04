@@ -5,6 +5,7 @@ import { getAllFlowersWithGenerated } from './random-flowers.js';
 import { clamp, ease, rgba, TAU } from './utils.js';
 import { getFlowerCache } from './flower-cache.js';
 import { drawStamens } from './stamens.js';
+import { visualEffects } from './visual-effects.js';
 
 const { GW, GH, VASE, DANGER_Y, DROP_Y, GAME_OVER_GRACE } = CONFIG;
 
@@ -17,12 +18,16 @@ export function drawBackground(ctx) {
     ctx.fillStyle = bg;
     ctx.fillRect(0, 0, GW, GH);
 
-    const glow = ctx.createRadialGradient(GW / 2, GH * .55, 50, GW / 2, GH * .55, 350);
-    glow.addColorStop(0, 'rgba(80,50,60,0.25)');
-    glow.addColorStop(.5, 'rgba(50,30,40,0.1)');
-    glow.addColorStop(1, 'rgba(0,0,0,0)');
-    ctx.fillStyle = glow;
-    ctx.fillRect(0, 0, GW, GH);
+    // Only draw glow on higher performance devices
+    const perfConfig = window.PERFORMANCE_CONFIG || { maxFPS: 60 };
+    if (perfConfig.maxFPS > 35) {
+        const glow = ctx.createRadialGradient(GW / 2, GH * .55, 50, GW / 2, GH * .55, 350);
+        glow.addColorStop(0, 'rgba(80,50,60,0.25)');
+        glow.addColorStop(.5, 'rgba(50,30,40,0.1)');
+        glow.addColorStop(1, 'rgba(0,0,0,0)');
+        ctx.fillStyle = glow;
+        ctx.fillRect(0, 0, GW, GH);
+    }
 }
 
 export function drawVase(ctx) {
@@ -35,19 +40,22 @@ export function drawVase(ctx) {
     drawVaseBottom(ctx, l, r, b, w, wallW);       // bottom
     drawVaseRim(ctx, l, r, t, wallW, rimH);       // rim stroke
 
-    // Glass reflections
-    ctx.save();
-    ctx.globalAlpha = .06;
-    ctx.strokeStyle = '#fff';
-    ctx.lineWidth = 2;
-    for (let i = 0; i < 3; i++) {
-        const rx = l + 20 + i * 35;
-        ctx.beginPath();
-        ctx.moveTo(rx, t + 30 + i * 40);
-        ctx.lineTo(rx + 8, t + 100 + i * 40);
-        ctx.stroke();
+    // Glass reflections - only on higher performance devices
+    const perfConfig = window.PERFORMANCE_CONFIG || { maxFPS: 60 };
+    if (perfConfig.maxFPS > 30) {
+        ctx.save();
+        ctx.globalAlpha = .06;
+        ctx.strokeStyle = '#fff';
+        ctx.lineWidth = 2;
+        for (let i = 0; i < 3; i++) {
+            const rx = l + 20 + i * 35;
+            ctx.beginPath();
+            ctx.moveTo(rx, t + 30 + i * 40);
+            ctx.lineTo(rx + 8, t + 100 + i * 40);
+            ctx.stroke();
+        }
+        ctx.restore();
     }
-    ctx.restore();
     ctx.restore();
 
     // Danger line
@@ -314,6 +322,9 @@ export function drawFlower(ctx, flower, t) {
     ctx.scale(scaleX * spawnSc, scaleY * spawnSc);
 
     if (glowAlpha > .01) {
+        // Apply bloom effect based on performance
+        visualEffects.addBloom(ctx, flower, pos, r, f.petalColor);
+        
         ctx.save();
         ctx.shadowColor = rgba(f.petalColor, glowAlpha * .8);
         ctx.shadowBlur = r * .8 * glowAlpha;

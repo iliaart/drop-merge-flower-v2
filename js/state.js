@@ -13,7 +13,7 @@ export const state = {
 
     // Game objects
     flowers: [],
-    particles: new ParticleSystem(),
+    particles: null, // Will be initialized in game.js with performance config
     ambientMotes: [],
     audio: new AudioSystem(),
     shake: null, // set after import
@@ -24,6 +24,8 @@ export const state = {
 
     // Input
     mouseX: 250, // GW/2 default
+    lastMouseX: 250,
+    lastMouseY: 250,
 
     // Game state
     gameState: 'playing',
@@ -32,6 +34,8 @@ export const state = {
     outOfBoundsCount: 0,
     canDrop: true,
     dropCooldown: 0,
+    dropIntervalId: null,
+    isContinuousDrop: false,
 
     // Levels
     currentLevel: 0,
@@ -52,4 +56,19 @@ export const state = {
     // Flower selection properties
     selectedFlower: null,
     isDragging: false,
+    
+    // Performance tracking
+    perfMonitor: {
+        frameCount: 0,
+        lastPerfCheck: 0,
+        avgFps: 60,
+        renderSkips: 0,
+        lastRenderTime: 0
+    },
+    
+    // Initialize particles in game.js with performance config
+    initParticles: function() {
+        const maxParticles = window.PERFORMANCE_CONFIG?.maxParticles || 500;
+        this.particles = new ParticleSystem(maxParticles);
+    }
 };

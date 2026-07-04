@@ -20,6 +20,13 @@
             width: 100vw;
             height: 100vh;
             cursor: default; /* Changed from 'none' to 'default' to enable mouse cursor */
+            /* Hardware acceleration for better mobile performance */
+            will-change: transform;
+            -webkit-transform: translateZ(0);
+            -moz-transform: translateZ(0);
+            -ms-transform: translateZ(0);
+            -o-transform: translateZ(0);
+            transform: translateZ(0);
         }
         #restart {
             display: none;
@@ -89,6 +96,7 @@
         import { getAllFlowersWithGenerated } from './js/random-flowers.js';
         import { CONFIG } from './js/config.js';
         import { generateRandomFlowerBatch, resetGeneratedFlowers, logGeneratedFlowers } from './js/random-flowers.js';
+        import { perfOptimizer, memoryManager } from './js/performance.js';
 
         const canvas = document.getElementById('game');
         const ctx = canvas.getContext('2d');
@@ -99,6 +107,38 @@
         window.OUTLINE_ENABLED = true;
         window.TESSELLATION_ENABLED = true;
 
+        // Performance optimization variables
+        let lastFrameTime = 0;
+        let frameSkipCounter = 0;
+        let perfMonitor = {
+            frameCount: 0,
+            lastPerfCheck: performance.now(),
+            avgFps: 60,
+            renderSkips: 0,
+            lastRenderTime: 0
+        };
+
+        // Device capability detection
+        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+        const isLowEndMobile = isMobile && (/Android/.test(navigator.userAgent) && navigator.hardwareConcurrency <= 4 ||
+                                           /iPhone/.test(navigator.userAgent) && parseInt(navigator.userAgent.match(/iPhone(\d+,\d+)/)?.[1]?.split(',')[0] || 0) < 12);
+                                           
+        // Performance-based settings
+        const PERF_SETTINGS = {
+            high: { maxFPS: 60, maxParticles: 500, ambientMotes: 15, mergeCheckFreq: 2 },
+            medium: { maxFPS: 45, maxParticles: 350, ambientMotes: 10, mergeCheckFreq: 3 },
+            low: { maxFPS: 30, maxParticles: 200, ambientMotes: 5, mergeCheckFreq: 4 }
+        };
+        
+        // Determine performance level based on device capabilities
+        let perfLevel = 'high';
+        if (isLowEndMobile) perfLevel = 'low';
+        else if (isMobile) perfLevel = 'medium';
+        else if (navigator.hardwareConcurrency <= 4) perfLevel = 'medium';
+        
+        const perfConfig = PERF_SETTINGS[perfLevel];
+        console.log(`Performance level set to: ${perfLevel} (${isMobile ? 'mobile' : 'desktop'})`);
+
         function updateFlowerCount() {
             // Count only generated flowers
             const allFlowers = getAllFlowersWithGenerated();
@@ -107,6 +147,12 @@
 
         function startGame() {
             if (typeof Matter !== 'undefined') {
+                // Pass performance config to game initialization
+                window.PERFORMANCE_CONFIG = {
+                    ...perfConfig,
+                    isMobile: isMobile,
+                    isLowEndDevice: isLowEndMobile
+                };
                 initGame(canvas, ctx, restartBtn, Matter);
                 setupInput();
                 restartBtn.addEventListener('click', restart);
@@ -128,8 +174,9 @@
                 await window.initializeUniquePalettes();
             }
             
-            // Generate 50 flowers with unique palettes ensuring petal colors and center colors don't repeat
-            generateRandomFlowerBatch(50); 
+            // Generate fewer flowers on low-end devices for better performance
+            const flowerCount = isLowEndMobile ? 30 : isMobile ? 40 : 50;
+            generateRandomFlowerBatch(flowerCount); 
             
             // Update MAX_LEVEL to reflect only generated flowers
             CONFIG.MAX_LEVEL = getAllFlowersWithGenerated().length - 1;
@@ -148,6 +195,14 @@
                 });
             }
         }
+
+        // Run performance optimization loop
+        function perfLoop() {
+            perfOptimizer.update();
+            memoryManager.update();
+            requestAnimationFrame(perfLoop);
+        }
+        perfLoop();
 
         boot();
     </script>

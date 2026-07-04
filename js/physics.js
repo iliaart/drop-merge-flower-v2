@@ -25,7 +25,7 @@ export function initPhysics() {
     state.walls.push(Bodies.rectangle(-thick / 2, GH / 2, thick, GH + thick * 2, wallOpts));                           // left
     state.walls.push(Bodies.rectangle(GW + thick / 2, GH / 2, thick, GH + thick * 2, wallOpts));                       // right
     state.walls.push(Bodies.rectangle(GW / 2, GH + thick / 2, GW, thick, wallOpts));                                  // bottom screen boundary
-    Matter.World.add(state.world, state.walls);
+    state.Matter.World.add(state.world, state.walls);
 
     Events.on(state.engine, 'collisionStart', onCollision);
 }

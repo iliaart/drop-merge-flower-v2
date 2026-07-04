@@ -1,7 +1,7 @@
 // Main Game Logic — orchestrator module
 import { state } from './state.js';
 import { CONFIG } from './config.js';
-import { clamp, rand, TAU } from './utils.js';
+import { clamp, rand, TAU, rgba } from './utils.js';
 import { generateRandomFlowerBatch, getAllFlowersWithGenerated, resetGeneratedFlowers, generateRandomFlower } from './random-flowers.js';
 import { ParticleSystem, spawnMergeParticles, spawnDropParticles } from './particle.js';
 import { visualEffects } from './visual-effects.js';
@@ -31,18 +31,25 @@ let perfMonitor = {
     lastRenderTime: 0
 };
 
-/** Initialize game with canvas, context, restart button, and Matter.js */
-// Main Game Logic — orchestrator module
+// Cache performance config to avoid repeated lookups
+let cachedPerformanceConfig = null;
+let lastPerformanceCheck = 0;
 
-
-
+function getPerformanceConfig() {
+    const now = Date.now();
+    if (!cachedPerformanceConfig || now - lastPerformanceCheck > 1000) { // Cache for 1 second
+        cachedPerformanceConfig = window.PERFORMANCE_CONFIG || { maxFPS: 60, mergeCheckFreq: 2, maxParticles: 500, ambientMotes: 15 };
+        lastPerformanceCheck = now;
+    }
+    return cachedPerformanceConfig;
+}
 
 /** Initialize game with canvas, context, restart button, and Matter.js */
 export async function initGame(canvasEl, ctxEl, restartBtnEl, MatterLib) {
     state.canvas = canvasEl;
     state.ctx = ctxEl;
     state.restartBtn = restartBtnEl;
-    state.Matter = MatterLib;
+    state.Matter = MatterLib; // Store MatterLib in state as per specification
 
     resizeCanvas();
     initPhysics();
@@ -202,6 +209,9 @@ function createFlower(x, y, level) {
         squashAmp: 0, lastVy: 0, idlePhase: rand(0, TAU), stamenPhase: rand(0, TAU),
         breathPhase: rand(0, TAU), repulsionDamping: 0, stopTimer: 0,
         isForcedStopped: false, resonanceTimer: 0, isInContact: false, vibrationEnergy: 0,
+        // Добавляем свойства для хранения истории позиций для хвоста
+        tailPositions: [],
+        lastTailUpdate: 0,
     };
     state.flowers.push(flower);
     // Store timeout ID to allow cleanup
@@ -214,6 +224,105 @@ export { createFlower };
 
 // Make createFlower function available globally
 window.createFlower = createFlower;
+
+/**
+ * Update the flower tail positions when dragging
+ * @param {object} flower - The flower object
+ * @param {number} currentTime - Current timestamp
+ */
+function updateFlowerTail(flower, currentTime) {
+    // Update the tail if the flower is selected and being dragged OR if it's kinematic (physics-driven motion)
+    // According to specification: kinematic state is determined by Matter.Body.getStatic returning false
+    const hasMatterBody = state.Matter && state.Matter.Body && typeof state.Matter.Body.getStatic === 'function';
+    const isKinematic = flower.body && hasMatterBody && !state.Matter.Body.getStatic(flower.body);
+    const isDragging = state.selectedFlower === flower && state.isDragging;
+    
+    if (isDragging || isKinematic) {
+        // Limit the frequency of tail updates (use 25ms as specified in spec instead of 50ms)
+        if (currentTime - flower.lastTailUpdate > 25) {
+            const pos = flower.body.position;
+            // Add current position to history
+            flower.tailPositions.push({
+                x: pos.x,
+                y: pos.y,
+                timestamp: currentTime
+            });
+            
+            // Limit tail length to 40 as specified in spec instead of 20
+            const maxTailLength = 40;
+            if (flower.tailPositions.length > maxTailLength) {
+                flower.tailPositions = flower.tailPositions.slice(-maxTailLength);
+            }
+            
+            flower.lastTailUpdate = currentTime;
+        }
+    } else {
+        // If flower is not being dragged or moving kinematically, clear position history
+        flower.tailPositions = [];
+    }
+}
+
+/**
+ * Draw the tail for a flower being dragged
+ * @param {CanvasRenderingContext2D} ctx - Canvas context
+ * @param {object} flower - The flower object
+ * @param {object} flowerData - The flower data containing color info
+ */
+function drawFlowerTail(ctx, flower, flowerData) {
+    if (!flower || !flower.tailPositions || flower.tailPositions.length < 2) return;
+    
+    const tailPoints = flower.tailPositions;
+    const tailLength = tailPoints.length;
+    
+    // Draw tail as a smooth curve with fading opacity and thickness
+    ctx.save();
+    ctx.beginPath();
+    
+    // Start at the earliest point with low opacity/thickness
+    const startPoint = tailPoints[0];
+    ctx.moveTo(startPoint.x, startPoint.y);
+    
+    // Draw line to each subsequent point
+    for (let i = 1; i < tailLength; i++) {
+        const point = tailPoints[i];
+        ctx.lineTo(point.x, point.y);
+    }
+    
+    // Use the flower's petal color for the tail
+    const tailColor = flowerData.petalColor || '#f5a0c0'; // Default to pink if no color defined
+    
+    // Create gradient along the tail for fading effect
+    const endPoint = tailPoints[tailLength - 1];
+    const gradient = ctx.createLinearGradient(
+        startPoint.x, startPoint.y, 
+        endPoint.x, endPoint.y
+    );
+    gradient.addColorStop(0, rgba(tailColor, 0.0)); // Fully transparent at start
+    gradient.addColorStop(0.5, rgba(tailColor, 0.4)); // More opaque in middle
+    gradient.addColorStop(1, rgba(tailColor, 0.7)); // Most opaque at end near flower
+    
+    ctx.strokeStyle = gradient;
+    ctx.lineWidth = 3;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.globalCompositeOperation = 'source-over'; // Ensure proper blending
+    ctx.stroke();
+    
+    // Optionally, draw fading circles along the tail for a particle effect
+    for (let i = 0; i < tailLength; i++) {
+        const point = tailPoints[i];
+        const progress = i / (tailLength - 1); // From 0 to 1
+        const alpha = progress * 0.7; // Fade from transparent to semi-opaque
+        const size = 2 * (0.3 + 0.7 * progress); // Smaller at start, larger near flower
+        
+        ctx.beginPath();
+        ctx.arc(point.x, point.y, size, 0, TAU);
+        ctx.fillStyle = rgba(tailColor, alpha);
+        ctx.fill();
+    }
+    
+    ctx.restore();
+}
 
 function removeFlower(idx) {
     const f = state.flowers[idx];
@@ -521,7 +630,7 @@ window.performMerge = performMerge;
 function gameLoop(timestamp) {
     // Performance optimization: skip frames if running behind
     const currentTime = timestamp;
-    const perfConfig = window.PERFORMANCE_CONFIG || { maxFPS: 60, mergeCheckFreq: 2 };
+    const perfConfig = getPerformanceConfig();
     const frameInterval = 1000 / perfConfig.maxFPS;
     const elapsed = currentTime - lastFrameTime;
     
@@ -546,8 +655,12 @@ function gameLoop(timestamp) {
     state.lastTime = timestamp;
     state.time += dt;
 
-    // Update physics
-    state.Matter.Engine.update(state.engine, dt * 1000);
+    // Update physics using the state's Matter reference
+    if (state.Matter && state.Matter.Engine) {
+        state.Matter.Engine.update(state.engine, dt * 1000);
+    } else {
+        console.warn("state.Matter is not initialized, physics update skipped.");
+    }
     applyForces(dt);
 
     // Update flower states
@@ -559,6 +672,12 @@ function gameLoop(timestamp) {
             if (f.spawnTimer >= .5) f.spawning = false;
         }
         updateSquash(f, dt);
+    }
+
+    // Update flower tails for dragged or kinematic flowers
+    for (const f of state.flowers) {
+        if (!f) continue;
+        updateFlowerTail(f, currentTime);
     }
 
     // Perform merge checks less frequently based on performance config
@@ -573,9 +692,20 @@ function gameLoop(timestamp) {
         if (state.dropCooldown <= 0) state.dropCooldown = 0;
     }
 
-    state.particles.update(dt);
+    // Update particles with performance cap
+    const maxParticles = perfConfig.maxParticles || 500;
+    if (state.particles && state.particles.count < maxParticles) {
+        state.particles.update(dt);
+    }
+    
     state.shake.update(dt);
-    state.ambientMotes.forEach(m => m.update(dt, state.time));
+    
+    // Update ambient motes with performance cap
+    const ambientMoteCount = perfConfig.ambientMotes || 15;
+    for (let i = 0; i < Math.min(state.ambientMotes.length, ambientMoteCount); i++) {
+        state.ambientMotes[i].update(dt, state.time);
+    }
+    
     visualEffects.update(dt);
 
     if (state.gameState === 'playing') checkGameOver(dt);
@@ -585,7 +715,7 @@ function gameLoop(timestamp) {
     const renderTime = performance.now();
     if (renderTime - perfMonitor.lastRenderTime >= frameInterval * 0.8) { // Allow 80% of frame time
         perfMonitor.lastRenderTime = renderTime;
-        renderFrame();
+        renderFrame(state.Matter);
     } else {
         perfMonitor.renderSkips++; // Track skipped renders
     }
@@ -593,7 +723,7 @@ function gameLoop(timestamp) {
     requestAnimationFrame(gameLoop);
 }
 
-function renderFrame() {
+function renderFrame(MatterLib) {
     // Render
     const ctx = state.ctx;
     ctx.save();
@@ -606,6 +736,7 @@ function renderFrame() {
     const unselectedFlowers = [];
     let selectedFlowerToRender = null;
 
+    // Optimize flower iteration - only process flowers that exist
     for (const f of state.flowers) {
         if (f) {
             if (state.selectedFlower === f) {
@@ -623,22 +754,36 @@ function renderFrame() {
 
     // Then draw the selected flower on top
     if (selectedFlowerToRender) {
+        // Draw the tail for the selected flower if it's being dragged OR in kinematic motion
+        // Check if Matter and Body.getStatic exist before calling
+        const hasMatterBody = MatterLib && MatterLib.Body && typeof MatterLib.Body.getStatic === 'function';
+        const isKinematic = selectedFlowerToRender.body && hasMatterBody && !MatterLib.Body.getStatic(selectedFlowerToRender.body);
+        const isDragging = state.isDragging;
+        if (isDragging || isKinematic) {
+            const allFlowers = getAllFlowersWithGenerated();
+            const flowerData = allFlowers[selectedFlowerToRender.level];
+            drawFlowerTail(ctx, selectedFlowerToRender, flowerData);
+        }
         drawFlower(ctx, selectedFlowerToRender, state.time);
     }
 
     // Draw visual effects
     visualEffects.draw(ctx);
     
-    // Draw particle system
-    state.particles.draw(ctx);
+    // Draw particle system with performance check
+    if (state.particles) {
+        state.particles.draw(ctx);
+    }
 
     // Draw selected flower indicator if there is one
     // NOTE: Only show highlight when flower is being dragged (kinetic state), not just selected
     if (state.selectedFlower && state.isDragging) {
-        const pos = state.selectedFlower.body.position;
+        // Check if Matter and Body.getStatic exist before accessing body properties
+        const hasMatterBody = state.Matter && state.Matter.Body && typeof state.Matter.Body.getStatic === 'function';
+        const pos = hasMatterBody && state.selectedFlower.body ? state.selectedFlower.body.position : { x: 0, y: 0 };
         const allFlowers = getAllFlowersWithGenerated();
         const f = allFlowers[state.selectedFlower.level];
-        const r = f.radius;
+        const r = f ? f.radius : 20; // Use default radius if flower data is not available
 
         // Draw a selection ring around the selected flower
         ctx.save();
@@ -677,6 +822,12 @@ function renderFrame() {
 function updateFlowers() {
     if (state.gameState !== 'playing') return;
 
+    const allFlowers = getAllFlowersWithGenerated();
+    const avgRadius = allFlowers.slice(0, Math.min(8, allFlowers.length)).reduce((sum, fl, idx) => {
+        const rad = fl.flowerType === 'orchid' ? fl.radius * 0.5 : fl.radius;
+        return sum + rad;
+    }, 0) / Math.min(8, allFlowers.length) || 40;
+
     // Update flower animations
     for (let i = 0; i < state.flowers.length; i++) {
         const f = state.flowers[i];
@@ -689,20 +840,17 @@ function updateFlowers() {
         if (state.selectedFlower !== f) {
             // Ensure gravity is enabled for non-dragged flowers
             if (f.body && typeof f.body.gravityScale !== 'undefined') {
-                const allFlowers = getAllFlowersWithGenerated();
                 const flowerData = allFlowers[f.level];
                 if (flowerData) {
                     const flowerRadius = flowerData.flowerType === 'orchid' ? flowerData.radius * 0.5 : flowerData.radius;
-                    const avgRadius = allFlowers.slice(0, Math.min(8, allFlowers.length)).reduce((sum, fl, idx) => {
-                        const rad = fl.flowerType === 'orchid' ? fl.radius * 0.5 : fl.radius;
-                        return sum + rad;
-                    }, 0) / Math.min(8, allFlowers.length) || 40;
                     
                     const densityModifier = 1 + (flowerRadius - avgRadius) * CONFIG.GRAVITY_DENSITY_FACTOR / avgRadius;
                     f.body.gravityScale = densityModifier;
                     
                     // Ensure the body is not static when not dragging
-                    if (state.Matter.Body.getStatic(f.body)) {
+                    // Check if Matter and Body.getStatic exist before calling
+                    const hasMatterBody = state.Matter && state.Matter.Body && typeof state.Matter.Body.getStatic === 'function';
+                    if (hasMatterBody && state.Matter.Body.getStatic(f.body)) {
                         state.Matter.Body.setStatic(f.body, false);
                     }
                 }
@@ -711,7 +859,11 @@ function updateFlowers() {
             // For dragged flower, temporarily disable gravity and make static
             if (f.body && state.isDragging) {
                 f.body.gravityScale = 0;
-                state.Matter.Body.setStatic(f.body, true);
+                // Check if Matter and Body exist before calling
+                const hasMatterBody = state.Matter && state.Matter.Body && typeof state.Matter.Body.setStatic === 'function';
+                if (hasMatterBody) {
+                    state.Matter.Body.setStatic(f.body, true);
+                }
             }
         }
 
@@ -730,7 +882,7 @@ function updateFlowers() {
         }
 
         // Handle merge glow effect
-        if (f.mergeGlow) {
+        if (f.mergeGlow > 0) {
             f.mergeGlow -= 0.05;
             if (f.mergeGlow <= 0) {
                 f.mergeGlow = 0;

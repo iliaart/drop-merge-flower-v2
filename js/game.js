@@ -464,6 +464,8 @@ function forceOverlapMerges() {
 }
 
 function performMerge(fa, fb, idxA, idxB) {
+    if (!fa || !fb) return;
+
     state.mergingSet.add(fa.body.id);
     state.mergingSet.add(fb.body.id);
     const mx = (fa.body.position.x + fb.body.position.x) / 2;
@@ -471,26 +473,34 @@ function performMerge(fa, fb, idxA, idxB) {
     const newLevel = fa.level + 1;
 
     // Check if either of the flowers being merged is currently selected
-    const wasSelected = (state.selectedFlower === fa || state.selectedFlower === fb);
+    const wasSelected = state.selectedFlower && (state.selectedFlower === fa || state.selectedFlower === fb);
 
     removeFlower(idxA);
     removeFlower(idxB);
 
     const nf = createFlower(mx, my, newLevel);
-    nf.spawning = true;
-    nf.mergeGlow = 1;
+    if (nf) {
+        nf.spawning = true;
+        nf.mergeGlow = 1;
 
-    // If one of the merged flowers was selected, select the new flower
-    if (wasSelected) {
-        state.selectedFlower = nf;
-        // Set isDragging to true so the player can continue moving the flower
-        state.isDragging = true;
+        // If one of the merged flowers was selected, select the new flower
+        if (wasSelected) {
+            state.selectedFlower = nf;
+            // Set isDragging to true so the player can continue moving the flower
+            state.isDragging = true;
+            
+            // Ensure the new flower has the correct physical properties for dragging
+            // Store original gravity scale and make kinematic during drag
+            nf.originalGravityScale = 0;  // Initially 0 since we're dragging
+            nf.body.gravityScale = 0;     // Disable gravity while dragging
+            state.Matter.Body.setStatic(nf.body, true);  // Make kinematic during drag
+        }
+
+        visualEffects.createMergeEffect(mx, my, newLevel);
+        state.shake.trigger(6 + newLevel * 2);
+        state.audio.playMerge(newLevel);
+        if (newLevel > state.highestLevel) state.highestLevel = newLevel;
     }
-
-    visualEffects.createMergeEffect(mx, my, newLevel);
-    state.shake.trigger(6 + newLevel * 2);
-    state.audio.playMerge(newLevel);
-    if (newLevel > state.highestLevel) state.highestLevel = newLevel;
 }
 
 // Make function available globally as per project specification
@@ -650,6 +660,71 @@ function renderFrame() {
     drawGameOver(ctx, state.time > 0 ? 0.016 : 0); // Используем state.time или фиксированное значение вместо dt
 
     ctx.restore();
+}
+
+function updateFlowers() {
+    if (state.gameState !== 'playing') return;
+
+    // Update flower animations
+    for (let i = 0; i < state.flowers.length; i++) {
+        const f = state.flowers[i];
+        if (!f) continue;
+
+        // Update animation time for this flower
+        f.animTime = (f.animTime || 0) + 1;
+        
+        // Update physics if not being dragged
+        if (state.selectedFlower !== f) {
+            // Ensure gravity is enabled for non-dragged flowers
+            if (f.body && typeof f.body.gravityScale !== 'undefined') {
+                const allFlowers = getAllFlowersWithGenerated();
+                const flowerData = allFlowers[f.level];
+                if (flowerData) {
+                    const flowerRadius = flowerData.flowerType === 'orchid' ? flowerData.radius * 0.5 : flowerData.radius;
+                    const avgRadius = allFlowers.slice(0, Math.min(8, allFlowers.length)).reduce((sum, fl, idx) => {
+                        const rad = fl.flowerType === 'orchid' ? fl.radius * 0.5 : fl.radius;
+                        return sum + rad;
+                    }, 0) / Math.min(8, allFlowers.length) || 40;
+                    
+                    const densityModifier = 1 + (flowerRadius - avgRadius) * CONFIG.GRAVITY_DENSITY_FACTOR / avgRadius;
+                    f.body.gravityScale = densityModifier;
+                    
+                    // Ensure the body is not static when not dragging
+                    if (state.Matter.Body.getStatic(f.body)) {
+                        state.Matter.Body.setStatic(f.body, false);
+                    }
+                }
+            }
+        } else {
+            // For dragged flower, temporarily disable gravity and make static
+            if (f.body && state.isDragging) {
+                f.body.gravityScale = 0;
+                state.Matter.Body.setStatic(f.body, true);
+            }
+        }
+
+        // Handle merge cooldown
+        if (f.mergeCooldown > 0) {
+            f.mergeCooldown--;
+        }
+
+        // Handle spawning effect
+        if (f.spawning) {
+            f.spawnProgress = (f.spawnProgress || 0) + 0.1;
+            if (f.spawnProgress >= 1) {
+                f.spawning = false;
+                f.spawnProgress = 1;
+            }
+        }
+
+        // Handle merge glow effect
+        if (f.mergeGlow) {
+            f.mergeGlow -= 0.05;
+            if (f.mergeGlow <= 0) {
+                f.mergeGlow = 0;
+            }
+        }
+    }
 }
 
 function updateSquash(f, dt) {

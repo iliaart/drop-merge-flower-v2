@@ -188,12 +188,16 @@ export function applyForces(dt) {
 
     // On low-performance devices, update fewer flowers per frame
     const perfConfig = window.PERFORMANCE_CONFIG || { maxFPS: 60 };
-    const updateFrequency = perfConfig.maxFPS > 30 ? 1 : 0.8; // Update fewer flowers on low-end devices
+    const updateFrequency = perfConfig.maxFPS > 30 ? 1 : perfConfig.maxFPS > 20 ? 0.7 : 0.4; // Update fewer flowers on low-end devices
+    
+    // Only process every nth flower based on performance
+    const updateStep = perfConfig.maxFPS > 30 ? 1 : perfConfig.maxFPS > 20 ? 2 : 3;
 
-    for (const f of state.flowers) {
+    for (let i = 0; i < state.flowers.length; i += updateStep) {
+        const f = state.flowers[i];
         if (!f) continue;
         
-        // Skip some updates on low-performance devices
+        // Skip some updates based on probability for additional performance
         if (Math.random() > updateFrequency) continue;
 
         const body = f.body;
@@ -212,8 +216,8 @@ export function applyForces(dt) {
         updateResonance(f, body, dt, speed, angSpeed);
         f.isInContact = false;
 
-        // Vibration buoyancy for light flowers
-        if (flowerRadius < avgRadius * 0.8) {
+        // Vibration buoyancy for light flowers - only on higher performance devices
+        if (perfConfig.maxFPS > 25 && flowerRadius < avgRadius * 0.8) {
             applyVibrationBuoyancy(f, body, flowerRadius, avgRadius);
         }
     }

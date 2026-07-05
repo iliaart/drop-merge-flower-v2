@@ -4,12 +4,42 @@ import { state } from './state.js';
 // Performance monitoring and adaptive quality adjustments
 export class PerformanceOptimizer {
     constructor() {
-        this.perfConfig = window.PERFORMANCE_CONFIG || { maxFPS: 60, maxParticles: 500, ambientMotes: 15 };
+        // Detect mobile devices for specific optimization
+        this.isMobile = /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+        
+        this.perfConfig = window.PERFORMANCE_CONFIG || { 
+            maxFPS: this.isMobile ? 30 : 60,  // Lower default FPS for mobile
+            maxParticles: 500, 
+            ambientMotes: 15,
+            mergeCheckFreq: 2,
+            maxFlowersForMerges: 60
+        };
+        
         this.qualityLevel = 'high'; // 'low', 'medium', 'high'
         this.lastAdjustment = performance.now();
         this.adjustmentInterval = 5000; // Adjust every 5 seconds
         this.fpsHistory = [];
         this.targetFPS = this.perfConfig.maxFPS;
+        this.frameSkipCounter = 0;
+        this.frameSkipThreshold = 0; // Will be calculated dynamically
+        this.batteryLevel = null;
+        
+        // Initialize performance configuration
+        this.initializePerformanceConfig();
+        
+        // Setup battery status listener if available
+        this.setupBatteryMonitoring();
+    }
+    
+    // Initialize performance configuration based on device type
+    initializePerformanceConfig() {
+        // Apply more aggressive limits for mobile devices
+        if (this.isMobile) {
+            this.perfConfig.maxParticles = Math.min(this.perfConfig.maxParticles, 300);
+            this.perfConfig.ambientMotes = Math.min(this.perfConfig.ambientMotes, 8);
+            this.perfConfig.mergeCheckFreq = Math.max(this.perfConfig.mergeCheckFreq || 2, 3);
+            this.perfConfig.maxFlowersForMerges = Math.min(this.perfConfig.maxFlowersForMerges || 60, 40);
+        }
     }
 
     // Monitor performance and adjust quality settings accordingly
@@ -48,85 +78,179 @@ export class PerformanceOptimizer {
         // Calculate average FPS from history
         const avgFPS = this.fpsHistory.reduce((sum, fps) => sum + fps, 0) / this.fpsHistory.length;
         
-        // Determine quality level based on FPS
-        if (avgFPS < this.targetFPS * 0.6) {
-            // Significantly underperforming, reduce quality
+        // Adjust quality based on performance with mobile-specific thresholds
+        let targetFPS = this.targetFPS;
+        
+        // On mobile, use different thresholds for quality adjustments
+        if (this.isMobile) {
+            if (avgFPS < targetFPS * 0.5) {
+                // Very low performance on mobile
+                if (this.qualityLevel !== 'low') {
+                    this.setQualityLevel('low');
+                    console.log('Mobile Performance: Reduced to lowest quality due to severe FPS drop');
+                }
+            } else if (avgFPS < targetFPS * 0.7) {
+                // Low performance on mobile
+                if (this.qualityLevel === 'high') {
+                    this.setQualityLevel('medium');
+                    console.log('Mobile Performance: Reduced to medium quality');
+                }
+            } else if (avgFPS > targetFPS * 0.85) {
+                // Good performance on mobile
+                if (this.qualityLevel === 'low') {
+                    this.setQualityLevel('medium');
+                    console.log('Mobile Performance: Increased to medium quality');
+                }
+            }
+        } else {
+            // Desktop thresholds (original behavior)
+            if (avgFPS < targetFPS * 0.6) {
+                if (this.qualityLevel !== 'low') {
+                    this.setQualityLevel('low');
+                    console.log('Performance: Reduced to low quality due to FPS drop');
+                }
+            } else if (avgFPS < targetFPS * 0.8) {
+                if (this.qualityLevel === 'high') {
+                    this.setQualityLevel('medium');
+                    console.log('Performance: Reduced to medium quality');
+                }
+            } else if (avgFPS > targetFPS * 0.9) {
+                if (this.qualityLevel === 'low') {
+                    this.setQualityLevel('medium');
+                    console.log('Performance: Increased to medium quality');
+                } else if (this.qualityLevel === 'medium' && this.targetFPS >= 45) {
+                    this.setQualityLevel('high');
+                    console.log('Performance: Increased to high quality');
+                }
+            }
+        }
+    }
+    
+    // Setup battery status monitoring if available
+    setupBatteryMonitoring() {
+        if (navigator.getBattery) {
+            navigator.getBattery().then(battery => {
+                this.batteryLevel = battery.level;
+                
+                battery.addEventListener('chargingchange', () => {
+                    this.handleBatteryStatusChange();
+                });
+                
+                battery.addEventListener('levelchange', () => {
+                    this.batteryLevel = battery.level;
+                    this.handleBatteryStatusChange();
+                });
+            });
+        }
+    }
+    
+    // Handle battery status changes
+    handleBatteryStatusChange() {
+        // If battery is low, apply more aggressive optimization
+        if (this.batteryLevel < 0.2 && !navigator.onLine) {
             if (this.qualityLevel !== 'low') {
                 this.setQualityLevel('low');
-                console.log('Performance: Reduced to low quality due to FPS drop');
+                console.log('Power Saving: Reduced to low quality due to low battery');
             }
-        } else if (avgFPS < this.targetFPS * 0.8) {
-            // Moderately underperforming, reduce quality
+            this.targetFPS = Math.min(this.targetFPS, 20);
+        } else if (this.batteryLevel < 0.5 && !navigator.onLine) {
             if (this.qualityLevel === 'high') {
                 this.setQualityLevel('medium');
-                console.log('Performance: Reduced to medium quality');
+                console.log('Power Saving: Reduced to medium quality due to moderate battery');
             }
-        } else if (avgFPS > this.targetFPS * 0.9) {
-            // Performing well, consider increasing quality
-            if (this.qualityLevel === 'low') {
-                this.setQualityLevel('medium');
-                console.log('Performance: Increased to medium quality');
-            } else if (this.qualityLevel === 'medium' && this.targetFPS >= 45) {
-                this.setQualityLevel('high');
-                console.log('Performance: Increased to high quality');
-            }
+            this.targetFPS = Math.min(this.targetFPS, 25);
         }
     }
 
     // Set quality level and adjust corresponding parameters
     setQualityLevel(level) {
         this.qualityLevel = level;
+        const baseConfig = window.PERFORMANCE_CONFIG || { maxFPS: 60 };
         
-        switch (level) {
-            case 'low':
-                // Reduce particle count, ambient motes, and other effects
-                window.PERFORMANCE_CONFIG.maxParticles = Math.floor(this.perfConfig.maxParticles * 0.4);
-                window.PERFORMANCE_CONFIG.ambientMotes = Math.max(1, Math.floor(this.perfConfig.ambientMotes * 0.3));
-                window.PERFORMANCE_CONFIG.mergeCheckFreq = 6; // Less frequent merge checks
-                window.PERFORMANCE_CONFIG.maxFPS = Math.min(30, this.perfConfig.maxFPS);
-                
-                // Reduce physics accuracy on low-end devices
-                if (state.Matter && state.engine) {
-                    state.engine.constraintIterations = 2; // Lower constraint iterations
-                    state.engine.positionIterations = 4;   // Lower position iterations
-                    state.engine.velocityIterations = 4;   // Lower velocity iterations
-                }
-                break;
-                
-            case 'medium':
-                // Moderate settings
-                window.PERFORMANCE_CONFIG.maxParticles = Math.floor(this.perfConfig.maxParticles * 0.7);
-                window.PERFORMANCE_CONFIG.ambientMotes = Math.floor(this.perfConfig.ambientMotes * 0.6);
-                window.PERFORMANCE_CONFIG.mergeCheckFreq = 4;
-                window.PERFORMANCE_CONFIG.maxFPS = Math.min(45, this.perfConfig.maxFPS);
-                
-                // Medium physics settings
-                if (state.Matter && state.engine) {
-                    state.engine.constraintIterations = 4;
-                    state.engine.positionIterations = 6;
-                    state.engine.velocityIterations = 6;
-                }
-                break;
-                
+        switch(level) {
             case 'high':
-                // High-quality settings
-                window.PERFORMANCE_CONFIG.maxParticles = this.perfConfig.maxParticles;
-                window.PERFORMANCE_CONFIG.ambientMotes = this.perfConfig.ambientMotes;
-                window.PERFORMANCE_CONFIG.mergeCheckFreq = this.perfConfig.mergeCheckFreq || 2;
-                window.PERFORMANCE_CONFIG.maxFPS = this.perfConfig.maxFPS;
-                
-                // High physics settings
-                if (state.Matter && state.engine) {
-                    state.engine.constraintIterations = 6;
-                    state.engine.positionIterations = 8;
-                    state.engine.velocityIterations = 8;
-                }
+                window.PERFORMANCE_CONFIG = { ...baseConfig, 
+                    maxParticles: baseConfig.maxParticles || 500, 
+                    ambientMotes: baseConfig.ambientMotes || 15, 
+                    mergeCheckFreq: baseConfig.mergeCheckFreq || 2,
+                    maxFlowersForMerges: baseConfig.maxFlowersForMerges || 60
+                };
+                break;
+            case 'medium':
+                window.PERFORMANCE_CONFIG = { ...baseConfig, 
+                    maxParticles: Math.floor((baseConfig.maxParticles || 500) * 0.6), 
+                    ambientMotes: Math.floor((baseConfig.ambientMotes || 15) * 0.6), 
+                    mergeCheckFreq: (baseConfig.mergeCheckFreq || 2) + 1,
+                    maxFlowersForMerges: Math.floor((baseConfig.maxFlowersForMerges || 60) * 0.6),
+                    maxFPS: Math.min(baseConfig.maxFPS || 60, this.isMobile ? 30 : 45)
+                };
+                break;
+            case 'low':
+                window.PERFORMANCE_CONFIG = { ...baseConfig, 
+                    maxParticles: Math.floor((baseConfig.maxParticles || 500) * 0.3), 
+                    ambientMotes: Math.max(1, Math.floor((baseConfig.ambientMotes || 15) * 0.2)), 
+                    mergeCheckFreq: (baseConfig.mergeCheckFreq || 2) + 2,
+                    maxFlowersForMerges: Math.floor((baseConfig.maxFlowersForMerges || 60) * 0.3),
+                    maxFPS: Math.min(baseConfig.maxFPS || 60, this.isMobile ? 20 : 30)
+                };
                 break;
         }
+        
+        // Apply physics settings based on quality level
+        this.applyPhysicsSettings();
         
         // Update particle system with new max particles
         if (state.particles) {
             state.particles.maxParticles = window.PERFORMANCE_CONFIG.maxParticles;
+        }
+    }
+    
+    // Apply physics engine settings based on quality level
+    applyPhysicsSettings() {
+        if (state.Matter && state.engine) {
+            switch(this.qualityLevel) {
+                case 'high':
+                    state.engine.constraintIterations = 6;
+                    state.engine.positionIterations = 8;
+                    state.engine.velocityIterations = 8;
+                    break;
+                case 'medium':
+                    state.engine.constraintIterations = 4;
+                    state.engine.positionIterations = 6;
+                    state.engine.velocityIterations = 6;
+                    break;
+                case 'low':
+                    state.engine.constraintIterations = 2;
+                    state.engine.positionIterations = 4;
+                    state.engine.velocityIterations = 4;
+                    break;
+            }
+        }
+    }
+    
+    // Get current performance level
+    getCurrentLevel() {
+        return this.qualityLevel;
+    }
+    
+    // Check if current frame should be skipped for performance
+    shouldSkipFrame() {
+        if (this.frameSkipThreshold <= 0) return false;
+        this.frameSkipCounter = (this.frameSkipCounter + 1) % 10;
+        return this.frameSkipCounter < this.frameSkipThreshold * 10;
+    }
+    
+    // Calculate frame skip threshold based on current performance
+    calculateFrameSkipThreshold(currentFPS) {
+        const target = this.perfConfig.maxFPS || 60;
+        if (currentFPS < target * 0.4) {
+            this.frameSkipThreshold = 0.6; // Skip 60% of frames on severe performance issues
+        } else if (currentFPS < target * 0.6) {
+            this.frameSkipThreshold = 0.4; // Skip 40% of frames
+        } else if (currentFPS < target * 0.8) {
+            this.frameSkipThreshold = 0.2; // Skip 20% of frames
+        } else {
+            this.frameSkipThreshold = 0; // Don't skip frames
         }
     }
 
@@ -209,4 +333,10 @@ export const memoryManager = new MemoryManager();
 // Setup visibility change listener
 document.addEventListener('visibilitychange', () => {
     perfOptimizer.handleVisibilityChange();
+});
+
+// Setup page hide listener for mobile optimization
+window.addEventListener('pagehide', () => {
+    // Reduce performance on page hide for better battery life
+    perfOptimizer.setQualityLevel('low');
 });

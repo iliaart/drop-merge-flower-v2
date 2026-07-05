@@ -159,21 +159,21 @@
 
         // Device capability detection
         const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-        const isLowEndMobile = isMobile && (/Android/.test(navigator.userAgent) && navigator.hardwareConcurrency <= 4 ||
-                                           /iPhone/.test(navigator.userAgent) && parseInt(navigator.userAgent.match(/iPhone(\d+,\d+)/)?.[1]?.split(',')[0] || 0) < 12);
+        const isLowEndMobile = isMobile && (/Android/.test(navigator.userAgent) && (navigator.hardwareConcurrency <= 2 || navigator.deviceMemory <= 2) ||
+                                           /iPhone/.test(navigator.userAgent) && parseInt(navigator.userAgent.match(/iPhone(\d+,\d+)/)?.[1]?.split(',')[0] || 0) < 10); // iPhone 6 and earlier
                                            
-        // Performance-based settings
+        // Performance-based settings - more aggressive on mobile
         const PERF_SETTINGS = {
-            high: { maxFPS: 60, maxParticles: 500, ambientMotes: 15, mergeCheckFreq: 2 },
-            medium: { maxFPS: 45, maxParticles: 350, ambientMotes: 10, mergeCheckFreq: 3 },
-            low: { maxFPS: 30, maxParticles: 200, ambientMotes: 5, mergeCheckFreq: 4 }
+            high: { maxFPS: 60, maxParticles: 500, ambientMotes: 15, mergeCheckFreq: 2, maxFlowersForMerges: 60 },
+            medium: { maxFPS: 45, maxParticles: 350, ambientMotes: 10, mergeCheckFreq: 3, maxFlowersForMerges: 40 },
+            low: { maxFPS: 25, maxParticles: 200, ambientMotes: 5, mergeCheckFreq: 5, maxFlowersForMerges: 20 } // Lower FPS cap and less frequent merge checks
         };
         
         // Determine performance level based on device capabilities
         let perfLevel = 'high';
         if (isLowEndMobile) perfLevel = 'low';
         else if (isMobile) perfLevel = 'medium';
-        else if (navigator.hardwareConcurrency <= 4) perfLevel = 'medium';
+        else if (navigator.hardwareConcurrency <= 4 || navigator.deviceMemory <= 4) perfLevel = 'medium';
         
         const perfConfig = PERF_SETTINGS[perfLevel];
         console.log(`Performance level set to: ${perfLevel} (${isMobile ? 'mobile' : 'desktop'})`);

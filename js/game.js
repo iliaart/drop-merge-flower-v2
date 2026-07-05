@@ -569,36 +569,6 @@ function checkGameOver(dt) {
 }
 
 /** Secondary merge check in game loop (distance-based) */
-function checkMerges() {
-    if (state.gameState !== 'playing') return;
-    const allFlowers = getAllFlowersWithGenerated();
-    for (let i = 0; i < state.flowers.length; i++) {
-        const fa = state.flowers[i];
-        if (!fa) continue;
-        // Get the actual collision radius for flower a (accounting for orchid reduction)
-        const flowerAData = allFlowers[fa.level];
-        const radiusA = flowerAData.flowerType === 'orchid' ? flowerAData.radius * 0.5 : flowerAData.radius;
-        for (let j = i + 1; j < state.flowers.length; j++) {
-            const fb = state.flowers[j];
-            if (!fb) continue;
-            if (fa.level !== fb.level || fa.level >= allFlowers.length - 1) continue;
-            if (state.mergingSet.has(fa.body.id) || state.mergingSet.has(fb.body.id)) continue;
-
-            const dx = fa.body.position.x - fb.body.position.x;
-            const dy = fa.body.position.y - fb.body.position.y;
-            const dist = Math.sqrt(dx * dx + dy * dy);
-            // Get the actual collision radius for flower b (accounting for orchid reduction)
-            const flowerBData = allFlowers[fb.level];
-            const radiusB = flowerBData.flowerType === 'orchid' ? flowerBData.radius * 0.5 : flowerBData.radius;
-            if (dist < radiusA + radiusB + MERGE_RADIUS_BONUS) {
-                if (typeof window.performMerge === 'function') {
-                    window.performMerge(fa, fb, i, j);
-                }
-                return; // one merge per frame to let physics settle
-            }
-        }
-    }
-}
 
 /**
  * Safety-net merge for same-level flowers that are physically overlapping
@@ -836,6 +806,43 @@ function renderFrame(MatterLib) {
         state.particles.draw(ctx);
     }
 
+    /*
+    // Draw selected flower indicator if there is one
+    // NOTE: Only show highlight when flower is being dragged (kinetic state), not just selected
+    if (state.selectedFlower && state.isDragging) {
+        // Check if Matter and Body.getStatic exist before accessing body properties
+        const hasMatterBody = state.Matter && state.Matter.Body && typeof state.Matter.Body.getStatic === 'function';
+        const pos = hasMatterBody && state.selectedFlower.body ? state.selectedFlower.body.position : { x: 0, y: 0 };
+        const allFlowers = getAllFlowersWithGenerated();
+        const f = allFlowers[state.selectedFlower.level];
+        const r = f ? f.radius : 20; // Use default radius if flower data is not available
+
+        // Draw a selection ring around the selected flower
+        ctx.save();
+        ctx.strokeStyle = 'rgba(255, 255, 0, 0.7)'; // Yellow selection ring
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.arc(pos.x, pos.y, Math.max(r + 10, 25), 0, TAU); // Slightly larger than flower radius
+
+        // Add a glow effect for better visibility
+        ctx.shadowColor = 'rgba(255, 255, 0, 0.6)';
+        ctx.shadowBlur = 10;
+
+        ctx.stroke();
+
+        // Draw an arrow pointing to the selected flower
+        ctx.beginPath();
+        ctx.moveTo(pos.x, pos.y - (Math.max(r + 15, 30)));
+        ctx.lineTo(pos.x - 5, pos.y - (Math.max(r + 25, 40)));
+        ctx.lineTo(pos.x + 5, pos.y - (Math.max(r + 25, 40)));
+        ctx.closePath();
+        ctx.fillStyle = 'rgba(255, 255, 0, 0.7)';
+        ctx.fill();
+
+        ctx.restore();
+    }
+    */
+
     drawPreviewFlower(ctx, state.time);
     drawNextPreview(ctx, state.time);
     drawHighestLevel(ctx);
@@ -932,4 +939,137 @@ function updateSquash(f, dt) {
         f.squashAmp = 0;
     }
     f.lastVy = vy;
+}
+
+/**
+ * Spatial hash grid for efficient collision detection
+ */
+class SpatialGrid {
+    constructor(width, height, cellSize) {
+        this.cellSize = cellSize;
+        this.cols = Math.ceil(width / cellSize);
+        this.rows = Math.ceil(height / cellSize);
+        this.grid = new Array(this.cols * this.rows).fill(null).map(() => []);
+    }
+    
+    getCellIndex(x, y) {
+        const col = Math.floor(x / this.cellSize);
+        const row = Math.floor(y / this.cellSize);
+        
+        if (col < 0 || col >= this.cols || row < 0 || row >= this.rows) {
+            return -1; // Out of bounds
+        }
+        
+        return row * this.cols + col;
+    }
+    
+    add(item, x, y) {
+        const index = this.getCellIndex(x, y);
+        if (index !== -1) {
+            this.grid[index].push(item);
+        }
+    }
+    
+    getNearbyItems(x, y) {
+        const items = [];
+        const leftCol = Math.floor((x - this.cellSize) / this.cellSize);
+        const rightCol = Math.floor((x + this.cellSize) / this.cellSize);
+        const topRow = Math.floor((y - this.cellSize) / this.cellSize);
+        const bottomRow = Math.floor((y + this.cellSize) / this.cellSize);
+        
+        for (let col = leftCol; col <= rightCol; col++) {
+            for (let row = topRow; row <= bottomRow; row++) {
+                if (col >= 0 && col < this.cols && row >= 0 && row < this.rows) {
+                    const index = row * this.cols + col;
+                    items.push(...this.grid[index]);
+                }
+            }
+        }
+        
+        return items;
+    }
+    
+    clear() {
+        for (let i = 0; i < this.grid.length; i++) {
+            this.grid[i] = [];
+        }
+    }
+}
+
+function checkMerges() {
+    if (state.gameState !== 'playing') return;
+    
+    // Skip merge checks on low-performance devices or if there are too many flowers
+    const perfConfig = window.PERFORMANCE_CONFIG || { maxFPS: 60, maxFlowersForMerges: 50 };
+    if (state.flowers.length > (perfConfig.maxFlowersForMerges || 50)) {
+        // Reduce frequency of checks when there are many flowers
+        if (Math.floor(state.time * 5) % 3 !== 0) return; // Check every 3 out of 5 frames
+    }
+    
+    const allFlowers = getAllFlowersWithGenerated();
+    
+    // Use spatial partitioning to reduce collision checks
+    const grid = new SpatialGrid(CONFIG.GW, CONFIG.GH, 100); // 100px grid cells
+    
+    // Populate grid with flowers
+    for (let i = 0; i < state.flowers.length; i++) {
+        const fa = state.flowers[i];
+        if (!fa) continue;
+        
+        // Get the actual collision radius for flower a (accounting for orchid reduction)
+        const flowerAData = allFlowers[fa.level];
+        const radiusA = flowerAData.flowerType === 'orchid' ? flowerAData.radius * 0.5 : flowerAData.radius;
+        
+        grid.add({flower: fa, index: i, radius: radiusA}, fa.body.position.x, fa.body.position.y);
+    }
+    
+    // Check for collisions using spatial grid
+    for (let i = 0; i < state.flowers.length; i++) {
+        const fa = state.flowers[i];
+        if (!fa) continue;
+        
+        // Get the actual collision radius for flower a (accounting for orchid reduction)
+        const flowerAData = allFlowers[fa.level];
+        const radiusA = flowerAData.flowerType === 'orchid' ? flowerAData.radius * 0.5 : flowerAData.radius;
+        
+        if (fa.level >= allFlowers.length - 1) continue;
+        if (state.mergingSet.has(fa.body.id)) continue;
+        
+        // Get nearby flowers from spatial grid instead of checking all flowers
+        const nearbyFlowers = grid.getNearbyItems(fa.body.position.x, fa.body.position.y);
+        
+        for (const nearby of nearbyFlowers) {
+            const fb = nearby.flower;
+            const j = nearby.index;
+            
+            if (!fb || i >= j) continue; // Avoid duplicate checks and self-checks
+            if (!fb || fa.level !== fb.level) continue;
+            if (state.mergingSet.has(fb.body.id)) continue;
+            
+            const dx = fa.body.position.x - fb.body.position.x;
+            const dy = fa.body.position.y - fb.body.position.y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            
+            // Get the actual collision radius for flower b (accounting for orchid reduction)
+            const flowerBData = allFlowers[fb.level];
+            const radiusB = flowerBData.flowerType === 'orchid' ? flowerBData.radius * 0.5 : flowerBData.radius;
+            
+            if (dist < radiusA + radiusB + MERGE_RADIUS_BONUS) {
+                if (typeof window.performMerge === 'function') {
+                    window.performMerge(fa, fb, i, j);
+                }
+                return; // one merge per frame to let physics settle
+            }
+        }
+    }
+}
+
+// Additional performance optimization function
+function shouldSkipFrame() {
+    const perfConfig = window.PERFORMANCE_CONFIG || { maxFPS: 60 };
+    // On very low performance devices, occasionally skip updates to maintain responsiveness
+    if (perfConfig.maxFPS < 25) {
+        return Math.random() > 0.7; // Skip 30% of frames on very low performance devices
+    }
+    return false;
 }

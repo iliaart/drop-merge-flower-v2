@@ -282,11 +282,17 @@ export function drawGameOverWarning(ctx) {
 export function drawFlower(ctx, flower, t) {
     const allFlowers = getAllFlowersWithGenerated();
     const f = allFlowers[flower.level];
+    if (!f) return; // Exit early if flower data doesn't exist
+    
     const pos = flower.body.position;
     const angle = flower.body.angle;
     // Use actual displayed radius regardless of collision size
     const r = f.radius;
 
+    // On low-performance devices, simplify animations
+    const perfConfig = window.PERFORMANCE_CONFIG || { maxFPS: 60 };
+    const shouldSimplifyAnimations = perfConfig.maxFPS < 30;
+    
     let scaleX = 1 + flower.squashS * .4;
     let scaleY = 1 - flower.squashS * .35;
 
@@ -297,8 +303,11 @@ export function drawFlower(ctx, flower, t) {
         scaleX *= 1 - stretch * .4;
     }
 
-    const breath = Math.sin(t * 1.8 + flower.breathPhase) * .015;
-    const sway = Math.sin(t * 1.2 + flower.idlePhase) * .03;
+    let breath = 0, sway = 0;
+    if (!shouldSimplifyAnimations) {
+        breath = Math.sin(t * 1.8 + flower.breathPhase) * .015;
+        sway = Math.sin(t * 1.2 + flower.idlePhase) * .03;
+    }
     scaleY *= 1 + breath;
     scaleX *= 1 - breath * .5;
 
@@ -311,7 +320,7 @@ export function drawFlower(ctx, flower, t) {
     let glowAlpha = 0;
     if (flower.mergeGlow > 0) {
         glowAlpha = flower.mergeGlow;
-        flower.mergeGlow *= .92;
+        flower.mergeGlow *= shouldSimplifyAnimations ? .88 : .92; // Faster fade on low performance
         if (flower.mergeGlow < .01) flower.mergeGlow = 0;
     }
 
@@ -327,31 +336,36 @@ export function drawFlower(ctx, flower, t) {
         
         ctx.save();
         ctx.shadowColor = rgba(f.petalColor, glowAlpha * .8);
-        ctx.shadowBlur = r * .8 * glowAlpha;
+        ctx.shadowBlur = shouldSimplifyAnimations ? r * .4 * glowAlpha : r * .8 * glowAlpha; // Less blur on low performance
         ctx.globalAlpha = glowAlpha * .5;
         ctx.drawImage(cache.canvas, -cache.cx * 2, -cache.cy * 2, cache.canvas.width, cache.canvas.height);
         ctx.restore();
     }
     ctx.drawImage(cache.canvas, -cache.cx * 2, -cache.cy * 2, cache.canvas.width, cache.canvas.height);
-    drawStamens(ctx, flower.level, r, t, flower.stamenPhase, flower.squashS);
     
-    // Restore transformation to draw text in screen coordinates
+    // Draw stamens only if performance allows
+    if (perfConfig.maxFPS > 20) {
+        drawStamens(ctx, flower.level, r, t, flower.stamenPhase, flower.squashS);
+    }
+    
     ctx.restore();
     
-    // Draw the generation number above the flower
-    ctx.save();
-    ctx.translate(pos.x, pos.y - r - 15); // Position above the flower
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.font = 'bold 14px Georgia, "Times New Roman", serif'; // Using Georgia as required by spec with fallbacks
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.9)'; // Slightly increased opacity
-    ctx.strokeStyle = 'rgba(0, 0, 0, 0.7)'; // Increased opacity for better contrast
-    ctx.lineWidth = 2; // Increased line width for better visibility
-    
-    // Draw text with outline first, then fill
-    ctx.strokeText(`${f.generationNumber || '?'}`, 0, 0);
-    ctx.fillText(`${f.generationNumber || '?'}`, 0, 0);
-    ctx.restore();
+    // Draw the generation number above the flower only on higher performance devices
+    if (perfConfig.maxFPS > 25) {
+        ctx.save();
+        ctx.translate(pos.x, pos.y - r - 15); // Position above the flower
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.font = 'bold 14px Georgia, "Times New Roman", serif'; // Using Georgia as required by spec with fallbacks
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.9)'; // Slightly increased opacity
+        ctx.strokeStyle = 'rgba(0, 0, 0, 0.7)'; // Increased opacity for better contrast
+        ctx.lineWidth = 2; // Increased line width for better visibility
+        
+        // Draw text with outline first, then fill
+        ctx.strokeText(`${f.generationNumber || '?'}`, 0, 0);
+        ctx.fillText(`${f.generationNumber || '?'}`, 0, 0);
+        ctx.restore();
+    }
     
     // Note: Selection indicator is now drawn in the main game loop to ensure proper layering
 }

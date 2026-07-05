@@ -836,46 +836,6 @@ function renderFrame(MatterLib) {
         state.particles.draw(ctx);
     }
 
-    // Draw selected flower indicator if there is one
-    // NOTE: Only show highlight when flower is in kinematic motion (dragging or moving), not just selected
-    if (state.selectedFlower) {
-        // Check if Matter and Body.getStatic exist before accessing body properties
-        const hasMatterBody = state.Matter && state.Matter.Body && typeof state.Matter.Body.getStatic === 'function';
-        const isKinematic = state.selectedFlower.body && hasMatterBody && !state.Matter.Body.getStatic(state.selectedFlower.body);
-        const isDragging = state.isDragging;
-        // Show highlight only when actually dragging or in kinematic motion
-        if (isDragging || isKinematic) {
-            const pos = hasMatterBody && state.selectedFlower.body ? state.selectedFlower.body.position : { x: 0, y: 0 };
-            const allFlowers = getAllFlowersWithGenerated();
-            const f = allFlowers[state.selectedFlower.level];
-            const r = f ? f.radius : 20; // Use default radius if flower data is not available
-
-            // Draw a selection ring around the selected flower
-            ctx.save();
-            ctx.strokeStyle = 'rgba(255, 255, 0, 0.7)'; // Yellow selection ring
-            ctx.lineWidth = 3;
-            ctx.beginPath();
-            ctx.arc(pos.x, pos.y, Math.max(r + 10, 25), 0, TAU); // Slightly larger than flower radius
-
-            // Add a glow effect for better visibility
-            ctx.shadowColor = 'rgba(255, 255, 0, 0.6)';
-            ctx.shadowBlur = 10;
-
-            ctx.stroke();
-
-            // Draw an arrow pointing to the selected flower
-            ctx.beginPath();
-            ctx.moveTo(pos.x, pos.y - (Math.max(r + 15, 30)));
-            ctx.lineTo(pos.x - 5, pos.y - (Math.max(r + 25, 40)));
-            ctx.lineTo(pos.x + 5, pos.y - (Math.max(r + 25, 40)));
-            ctx.closePath();
-            ctx.fillStyle = 'rgba(255, 255, 0, 0.7)';
-            ctx.fill();
-
-            ctx.restore();
-        }
-    }
-
     drawPreviewFlower(ctx, state.time);
     drawNextPreview(ctx, state.time);
     drawHighestLevel(ctx);

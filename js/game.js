@@ -786,6 +786,23 @@ function renderFrame(MatterLib) {
     drawBackground(ctx);
     drawVase(ctx);
 
+    // Draw tails for all flowers that are being dragged or in kinematic motion
+    // This ensures tails appear underneath flowers according to the specification
+    for (const f of state.flowers) {
+        if (f) {
+            // Check if Matter and Body.getStatic exist before calling
+            const hasMatterBody = MatterLib && MatterLib.Body && typeof MatterLib.Body.getStatic === 'function';
+            const isKinematic = f.body && hasMatterBody && !MatterLib.Body.getStatic(f.body);
+            const isDragging = state.selectedFlower === f && state.isDragging;
+            
+            if (isDragging || isKinematic) {
+                const allFlowers = getAllFlowersWithGenerated();
+                const flowerData = allFlowers[f.level];
+                drawFlowerTail(ctx, f, flowerData);
+            }
+        }
+    }
+
     // Separate the flowers into selected and unselected for rendering order
     const unselectedFlowers = [];
     let selectedFlowerToRender = null;
@@ -808,16 +825,6 @@ function renderFrame(MatterLib) {
 
     // Then draw the selected flower on top
     if (selectedFlowerToRender) {
-        // Draw the tail for the selected flower if it's being dragged OR in kinematic motion
-        // Check if Matter and Body.getStatic exist before calling
-        const hasMatterBody = MatterLib && MatterLib.Body && typeof MatterLib.Body.getStatic === 'function';
-        const isKinematic = selectedFlowerToRender.body && hasMatterBody && !MatterLib.Body.getStatic(selectedFlowerToRender.body);
-        const isDragging = state.isDragging;
-        if (isDragging || isKinematic) {
-            const allFlowers = getAllFlowersWithGenerated();
-            const flowerData = allFlowers[selectedFlowerToRender.level];
-            drawFlowerTail(ctx, selectedFlowerToRender, flowerData);
-        }
         drawFlower(ctx, selectedFlowerToRender, state.time);
     }
 
@@ -830,38 +837,43 @@ function renderFrame(MatterLib) {
     }
 
     // Draw selected flower indicator if there is one
-    // NOTE: Only show highlight when flower is being dragged (kinetic state), not just selected
-    if (state.selectedFlower && state.isDragging) {
+    // NOTE: Only show highlight when flower is in kinematic motion (dragging or moving), not just selected
+    if (state.selectedFlower) {
         // Check if Matter and Body.getStatic exist before accessing body properties
         const hasMatterBody = state.Matter && state.Matter.Body && typeof state.Matter.Body.getStatic === 'function';
-        const pos = hasMatterBody && state.selectedFlower.body ? state.selectedFlower.body.position : { x: 0, y: 0 };
-        const allFlowers = getAllFlowersWithGenerated();
-        const f = allFlowers[state.selectedFlower.level];
-        const r = f ? f.radius : 20; // Use default radius if flower data is not available
+        const isKinematic = state.selectedFlower.body && hasMatterBody && !state.Matter.Body.getStatic(state.selectedFlower.body);
+        const isDragging = state.isDragging;
+        // Show highlight only when actually dragging or in kinematic motion
+        if (isDragging || isKinematic) {
+            const pos = hasMatterBody && state.selectedFlower.body ? state.selectedFlower.body.position : { x: 0, y: 0 };
+            const allFlowers = getAllFlowersWithGenerated();
+            const f = allFlowers[state.selectedFlower.level];
+            const r = f ? f.radius : 20; // Use default radius if flower data is not available
 
-        // Draw a selection ring around the selected flower
-        ctx.save();
-        ctx.strokeStyle = 'rgba(255, 255, 0, 0.7)'; // Yellow selection ring
-        ctx.lineWidth = 3;
-        ctx.beginPath();
-        ctx.arc(pos.x, pos.y, Math.max(r + 10, 25), 0, TAU); // Slightly larger than flower radius
+            // Draw a selection ring around the selected flower
+            ctx.save();
+            ctx.strokeStyle = 'rgba(255, 255, 0, 0.7)'; // Yellow selection ring
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.arc(pos.x, pos.y, Math.max(r + 10, 25), 0, TAU); // Slightly larger than flower radius
 
-        // Add a glow effect for better visibility
-        ctx.shadowColor = 'rgba(255, 255, 0, 0.6)';
-        ctx.shadowBlur = 10;
+            // Add a glow effect for better visibility
+            ctx.shadowColor = 'rgba(255, 255, 0, 0.6)';
+            ctx.shadowBlur = 10;
 
-        ctx.stroke();
+            ctx.stroke();
 
-        // Draw an arrow pointing to the selected flower
-        ctx.beginPath();
-        ctx.moveTo(pos.x, pos.y - (Math.max(r + 15, 30)));
-        ctx.lineTo(pos.x - 5, pos.y - (Math.max(r + 25, 40)));
-        ctx.lineTo(pos.x + 5, pos.y - (Math.max(r + 25, 40)));
-        ctx.closePath();
-        ctx.fillStyle = 'rgba(255, 255, 0, 0.7)';
-        ctx.fill();
+            // Draw an arrow pointing to the selected flower
+            ctx.beginPath();
+            ctx.moveTo(pos.x, pos.y - (Math.max(r + 15, 30)));
+            ctx.lineTo(pos.x - 5, pos.y - (Math.max(r + 25, 40)));
+            ctx.lineTo(pos.x + 5, pos.y - (Math.max(r + 25, 40)));
+            ctx.closePath();
+            ctx.fillStyle = 'rgba(255, 255, 0, 0.7)';
+            ctx.fill();
 
-        ctx.restore();
+            ctx.restore();
+        }
     }
 
     drawPreviewFlower(ctx, state.time);

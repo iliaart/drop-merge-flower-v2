@@ -8,6 +8,7 @@ import { visualEffects } from './visual-effects.js';
 import { initPhysics, applyForces, updateAngularVelocity, destroyPhysics } from './physics.js';
 import { resizeCanvas, setupInput as _setupInput } from './input.js';
 import { ScreenShake, AmbientMote } from './effects.js';
+import { flowerPool } from './flower-pool.js'; // Import the flower pool
 import {
     drawBackground, drawVase, drawPreviewFlower, drawNextPreview,
     drawHighestLevel, drawGameOver, drawGameOverWarning, drawFlower
@@ -200,19 +201,41 @@ function createFlower(x, y, level) {
     body.flowerIdx = state.flowers.length;
     World.add(state.world, body);
 
-    state.Matter.Body.setAngle(body, rand(-TAU, TAU));
-    state.Matter.Body.setAngularVelocity(body, rand(-0.03, 0.03));
+    // Acquire a flower object from the pool instead of creating a new one
+    const flower = flowerPool.acquire();
+    
+    // Set the required properties for the flower
+    flower.body = body;
+    flower.level = level;
+    flower.justSpawned = true;
+    flower.spawning = false;
+    flower.spawnScale = 1;
+    flower.spawnTimer = 0;
+    flower.mergeGlow = 0;
+    flower.landingVy = 0;
+    flower.squashS = 0;
+    flower.squashV = 0;
+    flower.squashAmp = 0;
+    flower.lastVy = 0;
+    flower.idlePhase = rand(0, TAU); // Randomize phase to avoid visual artifacts
+    flower.stamenPhase = rand(0, TAU);
+    flower.breathPhase = rand(0, TAU);
+    flower.repulsionDamping = 0;
+    flower.stopTimer = 0;
+    flower.isForcedStopped = false;
+    flower.resonanceTimer = 0;
+    flower.isInContact = false;
+    flower.vibrationEnergy = 0;
+    // Clear and reset tail positions
+    flower.tailPositions.length = 0;
+    flower.lastTailUpdate = 0;
 
-    const flower = {
-        body, level, justSpawned: true, spawning: false, spawnScale: 1,
-        spawnTimer: 0, mergeGlow: 0, landingVy: 0, squashS: 0, squashV: 0,
-        squashAmp: 0, lastVy: 0, idlePhase: rand(0, TAU), stamenPhase: rand(0, TAU),
-        breathPhase: rand(0, TAU), repulsionDamping: 0, stopTimer: 0,
-        isForcedStopped: false, resonanceTimer: 0, isInContact: false, vibrationEnergy: 0,
-        // Добавляем свойства для хранения истории позиций для хвоста
-        tailPositions: [],
-        lastTailUpdate: 0,
-    };
+    // Clear any existing timeout ID
+    if (flower.timeoutId) {
+        clearTimeout(flower.timeoutId);
+        flower.timeoutId = null;
+    }
+
     state.flowers.push(flower);
     // Store timeout ID to allow cleanup
     const timeoutId = setTimeout(() => { flower.justSpawned = false; }, 300);
@@ -386,6 +409,10 @@ function removeFlower(idx) {
         clearTimeout(f.timeoutId);
     }
     state.Matter.World.remove(state.world, f.body);
+    
+    // Return the flower object to the pool for reuse
+    flowerPool.release(f);
+    
     state.flowers[idx] = null;
 }
 
@@ -460,11 +487,13 @@ export function restart() {
         prepareNextTimeoutId = null;
     }
 
-    // Clear all flower timeouts
+    // Clear all flower timeouts and return them to the pool
     state.flowers.forEach(f => {
         if (f && f.timeoutId) {
             clearTimeout(f.timeoutId);
         }
+        // Return each flower to the pool
+        flowerPool.release(f);
     });
 
     state.flowers.forEach(f => { if (f) state.Matter.World.remove(state.world, f.body); });
@@ -499,6 +528,9 @@ export function restart() {
     resetGeneratedFlowers();
     generateRandomFlowerBatch(50); // Generate more random flowers for variety
     CONFIG.MAX_LEVEL = getAllFlowersWithGenerated().length - 1;
+    
+    // Clear and reset the flower pool
+    flowerPool.clear();
     
     // Set initial highest level to allow generated flowers from start
     state.highestLevel = Math.min(7, getAllFlowersWithGenerated().length - 1);

@@ -95,30 +95,37 @@ export class PerformanceOptimizer {
                     this.setQualityLevel('medium');
                     console.log('Mobile Performance: Reduced to medium quality');
                 }
-            } else if (avgFPS > targetFPS * 0.85) {
-                // Good performance on mobile
+            } else if (avgFPS > targetFPS * 0.85 && this.qualityLevel !== 'high') {
+                // Good performance on mobile - only upgrade if not already high
                 if (this.qualityLevel === 'low') {
                     this.setQualityLevel('medium');
                     console.log('Mobile Performance: Increased to medium quality');
+                } else if (this.qualityLevel === 'medium' && avgFPS > targetFPS * 0.9) {
+                    // Higher threshold to go from medium to high
+                    this.setQualityLevel('high');
+                    console.log('Mobile Performance: Increased to high quality');
                 }
             }
         } else {
-            // Desktop thresholds (original behavior)
+            // Desktop thresholds with improved quality restoration
             if (avgFPS < targetFPS * 0.6) {
                 if (this.qualityLevel !== 'low') {
                     this.setQualityLevel('low');
                     console.log('Performance: Reduced to low quality due to FPS drop');
                 }
             } else if (avgFPS < targetFPS * 0.8) {
-                if (this.qualityLevel === 'high') {
+                // Downgrade to medium quality if performance is moderate
+                if (this.qualityLevel !== 'low') {
                     this.setQualityLevel('medium');
                     console.log('Performance: Reduced to medium quality');
                 }
-            } else if (avgFPS > targetFPS * 0.9) {
-                if (this.qualityLevel === 'low') {
+            } else if (avgFPS > targetFPS * 0.75) {
+                // Higher performance detected - upgrade quality if needed
+                if (this.qualityLevel === 'low' && avgFPS > targetFPS * 0.85) {
                     this.setQualityLevel('medium');
                     console.log('Performance: Increased to medium quality');
-                } else if (this.qualityLevel === 'medium' && this.targetFPS >= 45) {
+                } else if (this.qualityLevel === 'medium' && avgFPS > targetFPS * 0.9) {
+                    // Higher threshold to go from medium to high
                     this.setQualityLevel('high');
                     console.log('Performance: Increased to high quality');
                 }

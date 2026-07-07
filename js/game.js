@@ -78,7 +78,8 @@ export async function initGame(canvasEl, ctxEl, restartBtnEl, MatterLib) {
     // Generate random flowers for the game session
     resetGeneratedFlowers();
     // Use performance-appropriate flower count
-    const flowerCount = window.PERFORMANCE_CONFIG?.isLowEndDevice ? 30 : window.PERFORMANCE_CONFIG?.isMobile ? 40 : 50;
+    // Changed to generate 50 flowers on all mobile devices as per requirement
+    const flowerCount = window.PERFORMANCE_CONFIG?.isLowEndDevice ? 30 : 50;
     generateRandomFlowerBatch(flowerCount); // Generate more random flowers for variety
     
     // Update MAX_LEVEL to account for generated flowers
@@ -526,7 +527,9 @@ export function restart() {
     
     // Regenerate random flowers for the new game
     resetGeneratedFlowers();
-    generateRandomFlowerBatch(50); // Generate more random flowers for variety
+    // Use performance-appropriate flower count (same logic as initGame)
+    const restartFlowerCount = window.PERFORMANCE_CONFIG?.isLowEndDevice ? 30 : 50;
+    generateRandomFlowerBatch(restartFlowerCount); // Generate more random flowers for variety
     CONFIG.MAX_LEVEL = getAllFlowersWithGenerated().length - 1;
     
     // Clear and reset the flower pool

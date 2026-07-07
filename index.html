@@ -219,7 +219,7 @@
             }
             
             // Generate fewer flowers on low-end devices for better performance
-            const flowerCount = isLowEndMobile ? 30 : isMobile ? 40 : 50;
+            const flowerCount = window.PERFORMANCE_CONFIG?.isLowEndDevice ? 30 : 50;
             generateRandomFlowerBatch(flowerCount); 
             
             // Update MAX_LEVEL to reflect only generated flowers

@@ -41,6 +41,13 @@ export const state = {
     currentLevel: 0,
     nextLevel: 0,
     highestLevel: 0,
+    // Новые переменные для системы уровней
+    currentGameLevel: 1,                          // Текущий уровень игры (например, 1, 2, 3...) - gameLevel
+    targetFlowersForNextGameLevel: 10,            // Количество цветов максимального уровня, необходимое для перехода на следующий уровень
+    flowersAtMaxLevel: 0,                         // Счетчик цветов максимального уровня
+    minRequiredFlowerLevelForGameLevel: 2,        // Уровень цветка, который считается "максимальным" для текущего уровня игры - flowerLevel
+    levelTransitionActive: false,                 // Флаг активности перехода между уровнями
+    flowersToDrop: [],                            // Массив цветов, которые будут "падать" в следующем уровне
 
     // Merge tracking
     mergingSet: new Set(),

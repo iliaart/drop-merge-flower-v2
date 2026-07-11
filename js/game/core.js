@@ -11,6 +11,7 @@ import { ScreenShake, AmbientMote } from '../effects.js';
 import { flowerPool } from '../flower-pool.js';
 
 const { GW, GH, VASE, DANGER_Y, DROP_Y, MAX_LEVEL, GAME_OVER_GRACE, MAX_FLOWER_TYPES, MAX_TYPES_AT_FULL, ADAPTIVE_FILL_THRESHOLD } = CONFIG;
+const { TARGET_FLOWERS_FOR_NEXT_LEVEL, INITIAL_MAX_LEVEL_REQUIRED } = CONFIG;
 const GAME_OVER_FLOWER_THRESHOLD = 3; // need this many flowers out of bounds to lose
 
 // Track timeout IDs for proper cleanup
@@ -85,6 +86,14 @@ export async function initGame(canvasEl, ctxEl, restartBtnEl, MatterLib) {
     state.currentLevel = pickLevel();
     state.nextLevel = pickLevel();
     state.lastTime = performance.now();
+    
+    // Инициализация системы уровней
+    state.currentGameLevel = 1;                           // Текущий уровень игры
+    state.targetFlowersForNextGameLevel = TARGET_FLOWERS_FOR_NEXT_LEVEL || 10; // Целевое количество цветов для перехода
+    state.flowersAtMaxLevel = 0;                          // Счетчик цветов максимального уровня
+    state.minRequiredFlowerLevelForGameLevel = INITIAL_MAX_LEVEL_REQUIRED || 2; // Минимальный уровень цветка для текущего уровня игры
+    state.levelTransitionActive = false;                  // Флаг активности перехода между уровнями
+    state.flowersToDrop = [];                             // Массив цветов для следующего уровня
 }
 
 export function restart() {
@@ -149,6 +158,14 @@ export function restart() {
     state.canDrop = true;
     state.dropCooldown = 0;
     state.restartBtn.style.display = 'none';
+    
+    // Перезапуск системы уровней
+    state.currentGameLevel = 1;                           // Сброс до первого уровня
+    state.targetFlowersForNextGameLevel = TARGET_FLOWERS_FOR_NEXT_LEVEL || 10; // Сброс целевого количества
+    state.flowersAtMaxLevel = 0;                          // Сброс счетчика
+    state.minRequiredFlowerLevelForGameLevel = INITIAL_MAX_LEVEL_REQUIRED || 2; // Сброс требуемого уровня
+    state.levelTransitionActive = false;                  // Деактивация перехода
+    state.flowersToDrop = [];                             // Очистка массива цветов для следующего уровня
 }
 
 /**
@@ -257,6 +274,94 @@ export function checkGameOver(dt) {
 
 // Export utility functions
 export { getPerformanceConfig, perfMonitor };
+
+/**
+ * Проверяет, достиг ли игрок целевого количества цветов максимального уровня.
+ * При достижении цели активирует переход на следующий уровень.
+ */
+export function checkLevelProgress() {
+    if (state.levelTransitionActive || state.gameState !== 'playing') {
+        return false;
+    }
+
+    const allFlowers = getAllFlowersWithGenerated();
+    const maxLevel = allFlowers.length - 1;
+    
+    // Проверяем, есть ли цветы максимального уровня
+    const maxLevelFlowers = state.flowers.filter(f => 
+        f && f.level === maxLevel && 
+        f.body.position.y >= VASE.t
+    );
+    
+    state.flowersAtMaxLevel = maxLevelFlowers.length;
+    
+    // Если игрок собрал достаточно цветов максимального уровня
+    if (state.flowersAtMaxLevel >= state.targetFlowersForNextLevel) {
+        // Активируем переход на следующий уровень
+        state.levelTransitionActive = true;
+        state.currentGameLevel++;
+        
+        // Подготавливаем цветы для следующего уровня
+        prepareNextLevelFlowers();
+        
+        // Воспроизводим звук перехода на следующий уровень
+        if (state.audio.levelUp) {
+            state.audio.play(state.audio.levelUp);
+        }
+        
+        return true;
+    }
+    
+    return false;
+}
+
+/**
+ * Подготавливает цветы для следующего уровня
+ */
+function prepareNextLevelFlowers() {
+    const allFlowers = getAllFlowersWithGenerated();
+    const maxLevel = allFlowers.length - 1;
+    
+    // Очищаем предыдущие цветы уровня
+    state.flowersToDrop = [];
+    
+    // Добавляем цветы максимального уровня для следующего уровня
+    const maxLevelFlowers = state.flowers.filter(f => 
+        f && f.level === maxLevel && 
+        f.body.position.y >= VASE.t
+    );
+    
+    // Берем несколько цветов максимального уровня для следующего уровня
+    const flowersForNextLevel = Math.min(3, maxLevelFlowers.length);
+    
+    // Добавляем цветы в массив для следующего уровня
+    for (let i = 0; i < flowersForNextLevel; i++) {
+        state.flowersToDrop.push(maxLevelFlowers[i]);
+    }
+    
+    // Также добавляем несколько новых цветов из сгенерированных
+    const generatedFlowers = allFlowers.slice(8); // Пропускаем стандартные цветы
+    if (generatedFlowers.length > 0) {
+        const newFlowerCount = Math.min(2, generatedFlowers.length);
+        for (let i = 0; i < newFlowerCount; i++) {
+            // Добавляем случайный сгенерированный цветок
+            const randomIndex = Math.floor(Math.random() * generatedFlowers.length);
+            state.flowersToDrop.push({ level: 8 + randomIndex });
+        }
+    }
+}
+
+/**
+ * Получает цветок для следующего уровня
+ */
+export function getNextLevelFlower() {
+    if (state.flowersToDrop.length > 0) {
+        return state.flowersToDrop.pop();
+    }
+    
+    // Если цветов для уровня нет, возвращаем обычный цветок
+    return { level: pickLevel() };
+}
 
 // Export all functions that need to be available to other modules
 // Note: pickLevel, checkGameOver, getAllowedTypeCount are already exported above, so we don't need to include them here again

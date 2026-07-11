@@ -274,6 +274,63 @@ export function drawGameOverWarning(ctx) {
     ctx.restore();
 }
 
+/** Draw level progress information */
+export function drawLevelProgress(ctx) {
+    if (state.gameState !== 'playing') return;
+    
+    // Отображение текущего уровня игры
+    ctx.save();
+    ctx.fillStyle = 'rgba(255,255,255,0.7)';
+    ctx.font = '14px Georgia';
+    ctx.textAlign = 'right';
+    ctx.fillText(`Уровень: ${state.currentGameLevel}`, VASE.r - 10, VASE.t - 40);
+    ctx.restore();
+    
+    // Отображение прогресса до следующего уровня
+    ctx.save();
+    ctx.fillStyle = 'rgba(255,255,255,0.6)';
+    ctx.font = '12px Georgia';
+    ctx.textAlign = 'right';
+    ctx.fillText(`Цветы ${state.minRequiredFlowerLevelForGameLevel}+ ур.: ${state.flowersAtMaxLevel}/${state.targetFlowersForNextGameLevel}`, VASE.r - 10, VASE.t - 25);
+    ctx.restore();
+    
+    // Визуализация прогресс-бара
+    const barWidth = 150;
+    const barHeight = 6;
+    const barX = VASE.r - barWidth - 10;
+    const barY = VASE.t - 15;
+    
+    // Фон прогресс-бара
+    ctx.save();
+    ctx.fillStyle = 'rgba(100, 100, 100, 0.4)';
+    ctx.fillRect(barX, barY, barWidth, barHeight);
+    
+    // Заполнение прогресс-бара
+    const progress = Math.min(1, state.flowersAtMaxLevel / state.targetFlowersForNextGameLevel);
+    ctx.fillStyle = 'rgba(100, 255, 100, 0.6)';
+    ctx.fillRect(barX, barY, barWidth * progress, barHeight);
+    
+    ctx.restore();
+}
+
+/** Draw FPS counter in top-right corner */
+export function drawFPS(ctx) {
+    // Draw FPS counter in top-right corner of screen
+    ctx.save();
+    ctx.textAlign = 'right';
+    ctx.textBaseline = 'top';
+    ctx.font = '14px Georgia';
+    
+    // Semi-transparent background for better readability
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+    ctx.fillRect(GW - 80, 10, 70, 20);
+    
+    // FPS text
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fillText(`FPS: ${Math.round(state.perfMonitor.avgFps)}`, GW - 10, 15);
+    ctx.restore();
+}
+
 /** Draw a single flower (with squash/stretch, glow, stamens) */
 export function drawFlower(ctx, flower, t) {
     const allFlowers = getAllFlowersWithGenerated();

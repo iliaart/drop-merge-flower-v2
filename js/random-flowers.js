@@ -247,7 +247,7 @@ function generateRandomFlower() {
         stamenLen,
         stamenColor,
         antherSize,
-        level: 1,
+        level: 0, // Уровень будет установлен при создании цветка
         x: 0, // Will be set by the game
         y: 0, // Will be set by the game
         vx: 0, // Will be set by the game

@@ -11,7 +11,7 @@ import { ScreenShake, AmbientMote } from './effects.js';
 import { flowerPool } from './flower-pool.js'; // Import the flower pool
 import {
     drawBackground, drawVase, drawPreviewFlower, drawNextPreview,
-    drawHighestLevel, drawGameOver, drawGameOverWarning, drawFlower
+    drawHighestLevel, drawGameOver, drawGameOverWarning, drawFlower, drawLevelProgress
 } from './game-ui.js';
 
 // Import modules
@@ -27,9 +27,10 @@ const { GW, GH, VASE, DANGER_Y, DROP_Y, MAX_LEVEL, GAME_OVER_GRACE, MERGE_RADIUS
 const GAME_OVER_FLOWER_THRESHOLD = 3; // need this many flowers out of bounds to lose
 
 // Track timeout IDs for proper cleanup
-let dropTimeoutId = null;
+let currentDropTimeoutId = null;
 
 // Performance tracking
+let lastFrameTimestamp = 0;
 let lastFrameTime = 0;
 let frameSkipCounter = 0;
 
@@ -68,15 +69,15 @@ window.createFlower = createFlower;
 function gameLoop(timestamp) {
     // Get performance configuration
     const perfConfig = getPerformanceConfig();
-    
+
     // Calculate frame interval based on target FPS for render throttling
-    const targetFps = perfConfig.targetFps || 60; // Default to 60fps if not specified
-    const frameInterval = 1000 / targetFps; // Convert fps to ms per frame
-    
+    const targetFps = perfConfig?.targetFps || 60; // Default to 60fps if not specified
+    const frameIntervalMs = 1000 / targetFps; // Convert fps to ms per frame
+
     // Performance optimization: removed FPS cap to allow unlimited frame rate
     const currentTime = timestamp;
     lastFrameTime = currentTime;
-    
+
     // Update performance monitor
     perfMonitor.frameCount++;
     const now = performance.now();
@@ -152,7 +153,7 @@ function gameLoop(timestamp) {
 
     // Render - only if enough time has passed since last render for performance
     const renderTime = performance.now();
-    if (renderTime - perfMonitor.lastRenderTime >= frameInterval * 0.8) { // Allow 80% of frame time
+    if (renderTime - perfMonitor.lastRenderTime >= frameIntervalMs * 0.8) { // Allow 80% of frame time
         perfMonitor.lastRenderTime = renderTime;
         renderFrame(state.Matter);
     } else {

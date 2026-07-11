@@ -227,6 +227,12 @@ export function renderFrame(MatterLib) {
         uiModule.drawHighestLevel(ctx);
         uiModule.drawGameOverWarning(ctx);
         uiModule.drawGameOver(ctx, state.time > 0 ? 0.016 : 0); // Используем state.time или фиксированное значение вместо dt
+        
+        // Добавляем отображение прогресса уровня
+        uiModule.drawLevelProgress(ctx);
+        
+        // Добавляем отображение FPS
+        uiModule.drawFPS(ctx);
     }).catch(error => {
         console.error('Error importing game-ui:', error);
     });

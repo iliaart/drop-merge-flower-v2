@@ -28,4 +28,8 @@ export const CONFIG = {
     // Animation
     SQUASH_FREQ: 14,     // spring oscillation speed
     SQUASH_DAMP: 0.35,   // 0 = no damping, 1 = critical
+
+    // Level system - определяем переменные уровня здесь
+    FLOWERS_NEEDED_FOR_NEXT_LEVEL: 10, // Количество цветов максимального уровня, необходимое для перехода на следующий уровень
+    STARTING_MAX_LEVEL: 2,             // Начальный уровень, который считается максимальным для первого уровня игры
 };

@@ -121,7 +121,76 @@ export function performMerge(fa, fb, idxA, idxB) {
         state.shake.trigger(6 + newLevel * 2);
         state.audio.playMerge(newLevel);
         if (newLevel > state.highestLevel) state.highestLevel = newLevel;
+        
+        // Проверка системы уровней: если новый цветок достиг минимально требуемого уровня для текущего игрового уровня
+        if (newLevel >= state.minRequiredFlowerLevelForGameLevel) {
+            state.flowersAtMaxLevel++;
+            
+            // Проверка, набрано ли достаточное количество цветов максимального уровня
+            if (state.flowersAtMaxLevel >= state.targetFlowersForNextGameLevel) {
+                startLevelTransition();
+            }
+        }
     }
+}
+
+// Функция начала перехода на следующий уровень
+function startLevelTransition() {
+    if (state.levelTransitionActive) return; // Предотвращение повторного запуска
+    
+    state.levelTransitionActive = true;
+    
+    // Подсчет цветов максимального уровня для сохранения в следующем уровне
+    const allFlowers = getAllFlowersWithGenerated();
+    state.flowersToDrop = [];
+    
+    for (let i = 0; i < state.flowers.length; i++) {
+        const f = state.flowers[i];
+        if (!f) continue;
+        
+        // Сохраняем цветы минимально требуемого уровня
+        if (f.level >= state.minRequiredFlowerLevelForGameLevel) {
+            // Добавляем информацию о цветке для последующего "падения"
+            state.flowersToDrop.push({
+                level: f.level,
+                x: f.body.position.x,
+                y: f.body.position.y
+            });
+        }
+    }
+    
+    // Визуальные эффекты перехода между уровнями
+    state.shake.trigger(15); // Более сильная камера для эффекта перехода
+    state.audio.playDrop(); // Проигрывание звука
+    
+    // Начало процесса "падения" цветов
+    setTimeout(() => {
+        // Очистка текущего уровня
+        for (let i = state.flowers.length - 1; i >= 0; i--) {
+            const f = state.flowers[i];
+            if (f) {
+                removeFlower(i);
+            }
+        }
+        
+        // Обновление информации о уровне
+        state.currentGameLevel++;
+        state.flowersAtMaxLevel = 0; // Сброс счетчика
+        state.minRequiredFlowerLevelForGameLevel++; // Увеличение требуемого уровня
+        
+        // Добавление цветов в следующий уровень (с задержкой для эффекта падения)
+        setTimeout(() => {
+            state.flowersToDrop.forEach(flowerData => {
+                // Создание цветов в случайных позициях сверху
+                const randomX = Math.random() * (CONFIG.VASE.r - CONFIG.VASE.l - 100) + CONFIG.VASE.l + 50;
+                createFlower(randomX, CONFIG.DROP_Y, flowerData.level);
+            });
+            
+            // Очистка массива цветов для следующего уровня
+            state.flowersToDrop = [];
+            state.levelTransitionActive = false;
+        }, 1000); // Задержка перед появлением цветов в новом уровне
+    }, 500); // Задержка перед очисткой для визуального эффекта
 }
 
 // Make function available globally as per project specification

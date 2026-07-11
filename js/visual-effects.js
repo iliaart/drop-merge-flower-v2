@@ -17,8 +17,8 @@ export class BaseEffect {
     
     generateParticles() {
         // Base particle generation (can be overridden)
-        const perfConfig = window.PERFORMANCE_CONFIG || { maxFPS: 60 };
-        if (perfConfig.maxFPS < 30) return;
+        const perfConfig = window.PERFORMANCE_CONFIG || {};
+        // Removed performance-based check since we removed FPS limitations
         
         const count = this.options.count || 10;
         const color = this.options.color || '#ffffff';
@@ -135,9 +135,9 @@ export class BloomEffect {
     
     // Apply bloom effect to a flower
     apply(ctx, flower, position, radius, petalColor) {
-        // Skip bloom on low-performance devices
-        const perfConfig = window.PERFORMANCE_CONFIG || { maxFPS: 60 };
-        if (perfConfig.maxFPS < 35 || !this.enabled) return;
+        // Skip bloom on low-performance devices - removed since we removed FPS limitations
+        const perfConfig = window.PERFORMANCE_CONFIG || {};
+        if (!this.enabled) return; // Only check if effects are disabled
         
         // Use simplified bloom effect on mobile devices
         if (perfConfig.isMobile) {
@@ -216,9 +216,9 @@ export class VisualEffectManager {
     
     // Add a new effect
     addEffect(type, x, y, options = {}) {
-        // Skip effects on low-performance devices
-        const perfConfig = window.PERFORMANCE_CONFIG || { maxFPS: 60 };
-        if (perfConfig.maxFPS < 25) return;
+        // Skip effects on low-performance devices - removed since we removed FPS limitations
+        const perfConfig = window.PERFORMANCE_CONFIG || {};
+        // Removed performance-based check since we removed FPS limitations
         
         const effect = new ParticleEffect(type, x, y, options);
         this.effects.push(effect);
@@ -226,9 +226,9 @@ export class VisualEffectManager {
     
     // Update all effects
     update(dt) {
-        // Skip updates on very low-performance devices
-        const perfConfig = window.PERFORMANCE_CONFIG || { maxFPS: 60 };
-        if (perfConfig.maxFPS < 20) return;
+        // Skip updates on very low-performance devices - removed since we removed FPS limitations
+        const perfConfig = window.PERFORMANCE_CONFIG || {};
+        // Removed performance-based check since we removed FPS limitations
         
         for (let i = this.effects.length - 1; i >= 0; i--) {
             const effect = this.effects[i];
@@ -254,9 +254,9 @@ export class VisualEffectManager {
     
     // Draw all effects
     draw(ctx) {
-        // Skip drawing on very low-performance devices
-        const perfConfig = window.PERFORMANCE_CONFIG || { maxFPS: 60 };
-        if (perfConfig.maxFPS < 20) return;
+        // Skip drawing on very low-performance devices - removed since we removed FPS limitations
+        const perfConfig = window.PERFORMANCE_CONFIG || {};
+        // Removed performance-based check since we removed FPS limitations
         
         for (const effect of this.effects) {
             effect.draw(ctx);
@@ -274,9 +274,9 @@ export class VisualEffectManager {
         const f = allFlowers[level];
         if (!f) return;
         
-        // Reduce effect intensity on lower performance devices
-        const perfConfig = window.PERFORMANCE_CONFIG || { maxFPS: 60 };
-        const intensity = perfConfig.maxFPS > 45 ? 1.0 : perfConfig.maxFPS > 30 ? 0.7 : 0.4;
+        // Reduce effect intensity on lower performance devices - removed since we removed FPS limitations
+        const perfConfig = window.PERFORMANCE_CONFIG || {};
+        const intensity = 1.0; // Full intensity since we removed FPS limitations
         
         // Create primary particles - more intense and longer lasting
         this.addEffect('merge', x, y, {
@@ -335,9 +335,9 @@ export class VisualEffectManager {
         const f = allFlowers[level];
         if (!f) return;
         
-        // Reduce effect intensity on lower performance devices
-        const perfConfig = window.PERFORMANCE_CONFIG || { maxFPS: 60 };
-        const intensity = perfConfig.maxFPS > 45 ? 1.0 : perfConfig.maxFPS > 30 ? 0.7 : 0.4;
+        // Reduce effect intensity on lower performance devices - removed since we removed FPS limitations
+        const perfConfig = window.PERFORMANCE_CONFIG || {};
+        const intensity = 1.0; // Full intensity since we removed FPS limitations
         
         this.addEffect('drop', x, y, {
             count: Math.floor(4 * intensity),
@@ -348,9 +348,9 @@ export class VisualEffectManager {
     
     // Create selection effect
     createSelectionEffect(x, y, radius) {
-        // Reduce effect intensity on lower performance devices
-        const perfConfig = window.PERFORMANCE_CONFIG || { maxFPS: 60 };
-        if (perfConfig.maxFPS < 35) return; // Skip on low-end devices
+        // Reduce effect intensity on lower performance devices - removed since we removed FPS limitations
+        const perfConfig = window.PERFORMANCE_CONFIG || {};
+        // Removed performance-based check since we removed FPS limitations
         
         this.addEffect('selection', x, y, {
             count: 8,

@@ -18,16 +18,14 @@ export function drawBackground(ctx) {
     ctx.fillStyle = bg;
     ctx.fillRect(0, 0, GW, GH);
 
-    // Only draw glow on higher performance devices
-    const perfConfig = window.PERFORMANCE_CONFIG || { maxFPS: 60 };
-    if (perfConfig.maxFPS > 35) {
-        const glow = ctx.createRadialGradient(GW / 2, GH * .55, 50, GW / 2, GH * .55, 350);
-        glow.addColorStop(0, 'rgba(80,50,60,0.25)');
-        glow.addColorStop(.5, 'rgba(50,30,40,0.1)');
-        glow.addColorStop(1, 'rgba(0,0,0,0)');
-        ctx.fillStyle = glow;
-        ctx.fillRect(0, 0, GW, GH);
-    }
+    // Draw glow regardless of performance since we removed FPS limitations
+    const perfConfig = window.PERFORMANCE_CONFIG || {};
+    const glow = ctx.createRadialGradient(GW / 2, GH * .55, 50, GW / 2, GH * .55, 350);
+    glow.addColorStop(0, 'rgba(80,50,60,0.25)');
+    glow.addColorStop(.5, 'rgba(50,30,40,0.1)');
+    glow.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = glow;
+    ctx.fillRect(0, 0, GW, GH);
 }
 
 export function drawVase(ctx) {
@@ -40,22 +38,20 @@ export function drawVase(ctx) {
     drawVaseBottom(ctx, l, r, b, w, wallW);       // bottom
     drawVaseRim(ctx, l, r, t, wallW, rimH);       // rim stroke
 
-    // Glass reflections - only on higher performance devices
-    const perfConfig = window.PERFORMANCE_CONFIG || { maxFPS: 60 };
-    if (perfConfig.maxFPS > 30) {
-        ctx.save();
-        ctx.globalAlpha = .06;
-        ctx.strokeStyle = '#fff';
-        ctx.lineWidth = 2;
-        for (let i = 0; i < 3; i++) {
-            const rx = l + 20 + i * 35;
-            ctx.beginPath();
-            ctx.moveTo(rx, t + 30 + i * 40);
-            ctx.lineTo(rx + 8, t + 100 + i * 40);
-            ctx.stroke();
-        }
-        ctx.restore();
+    // Glass reflections - now enabled regardless of performance since we removed FPS limitations
+    const perfConfig = window.PERFORMANCE_CONFIG || {};
+    ctx.save();
+    ctx.globalAlpha = .06;
+    ctx.strokeStyle = '#fff';
+    ctx.lineWidth = 2;
+    for (let i = 0; i < 3; i++) {
+        const rx = l + 20 + i * 35;
+        ctx.beginPath();
+        ctx.moveTo(rx, t + 30 + i * 40);
+        ctx.lineTo(rx + 8, t + 100 + i * 40);
+        ctx.stroke();
     }
+    ctx.restore();
     ctx.restore();
 
     // Danger line
@@ -289,9 +285,9 @@ export function drawFlower(ctx, flower, t) {
     // Use actual displayed radius regardless of collision size
     const r = f.radius;
 
-    // On low-performance devices, simplify animations
-    const perfConfig = window.PERFORMANCE_CONFIG || { maxFPS: 60 };
-    const shouldSimplifyAnimations = perfConfig.maxFPS < 30;
+    // On low-performance devices, simplify animations - removed FPS-based check since we removed the cap
+    const perfConfig = window.PERFORMANCE_CONFIG || {};
+    const shouldSimplifyAnimations = false; // Disable animation simplification since we removed FPS cap
     
     let scaleX = 1 + flower.squashS * .4;
     let scaleY = 1 - flower.squashS * .35;
@@ -343,29 +339,25 @@ export function drawFlower(ctx, flower, t) {
     }
     ctx.drawImage(cache.canvas, -cache.cx * 2, -cache.cy * 2, cache.canvas.width, cache.canvas.height);
     
-    // Draw stamens only if performance allows
-    if (perfConfig.maxFPS > 20) {
-        drawStamens(ctx, flower.level, r, t, flower.stamenPhase, flower.squashS);
-    }
+    // Draw stamens regardless of performance since we removed FPS limitations
+    drawStamens(ctx, flower.level, r, t, flower.stamenPhase, flower.squashS);
     
     ctx.restore();
     
-    // Draw the generation number above the flower only on higher performance devices
-    if (perfConfig.maxFPS > 25) {
-        ctx.save();
-        ctx.translate(pos.x, pos.y - r - 15); // Position above the flower
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.font = 'bold 14px Georgia, "Times New Roman", serif'; // Using Georgia as required by spec with fallbacks
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.9)'; // Slightly increased opacity
-        ctx.strokeStyle = 'rgba(0, 0, 0, 0.7)'; // Increased opacity for better contrast
-        ctx.lineWidth = 2; // Increased line width for better visibility
-        
-        // Draw text with outline first, then fill
-        ctx.strokeText(`${f.generationNumber || '?'}`, 0, 0);
-        ctx.fillText(`${f.generationNumber || '?'}`, 0, 0);
-        ctx.restore();
-    }
+    // Draw the generation number above the flower regardless of performance since we removed FPS limitations
+    ctx.save();
+    ctx.translate(pos.x, pos.y - r - 15); // Position above the flower
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.font = 'bold 14px Georgia, "Times New Roman", serif'; // Using Georgia as required by spec with fallbacks
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.9)'; // Slightly increased opacity
+    ctx.strokeStyle = 'rgba(0, 0, 0, 0.7)'; // Increased opacity for better contrast
+    ctx.lineWidth = 2; // Increased line width for better visibility
+    
+    // Draw text with outline first, then fill
+    ctx.strokeText(`${f.generationNumber || '?'}`, 0, 0);
+    ctx.fillText(`${f.generationNumber || '?'}`, 0, 0);
+    ctx.restore();
     
     // Note: Selection indicator is now drawn in the main game loop to ensure proper layering
 }

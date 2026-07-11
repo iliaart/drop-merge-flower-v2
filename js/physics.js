@@ -71,9 +71,9 @@ function onCollision(event) {
     });
 
     // Phase 2: smooth repulsion for non-merging flower collisions
-    // On low-performance devices, skip some repulsion calculations
-    const perfConfig = window.PERFORMANCE_CONFIG || { maxFPS: 60 };
-    if (perfConfig.maxFPS < 30 && Math.random() > 0.7) return; // Skip 30% of repulsion calcs on very low-end devices
+    // With unlimited FPS, we don't skip repulsion calculations based on performance
+    const perfConfig = window.PERFORMANCE_CONFIG || {};
+    // Removed performance-based skipping since we removed FPS limitations
 
     event.pairs.forEach(pair => {
         const a = pair.bodyA, b = pair.bodyB;
@@ -123,10 +123,8 @@ function applyRepulsionWithRadii(a, b, fa, fb, radiusA, radiusB) {
     let repulsionStrength = Math.min(sharpOverlap * 0.35 * avgDamping, 0.5);
 
     // On low-performance devices, reduce repulsion force
-    const perfConfig = window.PERFORMANCE_CONFIG || { maxFPS: 60 };
-    if (perfConfig.maxFPS < 30) {
-        repulsionStrength *= 0.7; // Reduce repulsion force on low-end devices
-    }
+    const perfConfig = window.PERFORMANCE_CONFIG || {};
+    // Removed performance-based adjustment since we removed FPS limitations
 
     state.Matter.Body.applyForce(a, a.position, { x: -nx * repulsionStrength, y: -ny * repulsionStrength });
     state.Matter.Body.applyForce(b, b.position, { x: nx * repulsionStrength, y: ny * repulsionStrength });
@@ -186,12 +184,13 @@ export function applyForces(dt) {
     }
     const avgRadius = count > 0 ? totalRadius / count : 40;
 
-    // On low-performance devices, update fewer flowers per frame
-    const perfConfig = window.PERFORMANCE_CONFIG || { maxFPS: 60 };
-    const updateFrequency = perfConfig.maxFPS > 30 ? 1 : perfConfig.maxFPS > 20 ? 0.7 : 0.4; // Update fewer flowers on low-end devices
+    // On low-performance devices, update fewer flowers per frame - removed since we removed FPS limitations
+    const perfConfig = window.PERFORMANCE_CONFIG || {};
+    // Removed performance-based update frequency since we removed FPS limitations
+    const updateFrequency = 1.0; // Always update at full frequency
     
-    // Only process every nth flower based on performance
-    const updateStep = perfConfig.maxFPS > 30 ? 1 : perfConfig.maxFPS > 20 ? 2 : 3;
+    // Process every flower since we removed performance limitations
+    const updateStep = 1;
 
     for (let i = 0; i < state.flowers.length; i += updateStep) {
         const f = state.flowers[i];
@@ -216,8 +215,8 @@ export function applyForces(dt) {
         updateResonance(f, body, dt, speed, angSpeed);
         f.isInContact = false;
 
-        // Vibration buoyancy for light flowers - only on higher performance devices
-        if (perfConfig.maxFPS > 25 && flowerRadius < avgRadius * 0.8) {
+        // Vibration buoyancy for light flowers - now enabled regardless of performance since we removed FPS limitations
+        if (flowerRadius < avgRadius * 0.8) {
             applyVibrationBuoyancy(f, body, flowerRadius, avgRadius);
         }
     }
@@ -263,9 +262,9 @@ function updateResonance(f, body, dt, speed, angSpeed) {
 }
 
 function applyVibrationBuoyancy(f, body, flowerRadius, avgRadius) {
-    // On low-performance devices, skip vibration calculations
-    const perfConfig = window.PERFORMANCE_CONFIG || { maxFPS: 60 };
-    if (perfConfig.maxFPS < 35) return; // Skip vibration calculations on low-end devices
+    // On low-performance devices, skip vibration calculations - removed since we removed FPS limitations
+    const perfConfig = window.PERFORMANCE_CONFIG || {};
+    // Removed performance-based skipping since we removed FPS limitations
 
     let vibrationForce = 0;
     for (const other of state.flowers) {
@@ -298,9 +297,10 @@ export function updateAngularVelocity(f) {
         state.Matter.Body.setAngularVelocity(body, body.velocity.x * 0.001);
     }
     if (Math.abs(currentAngVel) > angVelThreshold) {
-        // On low-performance devices, increase damping
-        const perfConfig = window.PERFORMANCE_CONFIG || { maxFPS: 60 };
-        const dampingFactor = perfConfig.maxFPS > 30 ? 0.97 : 0.94; // More damping on low-end devices
+        // On low-performance devices, increase damping - removed since we removed FPS limitations
+        const perfConfig = window.PERFORMANCE_CONFIG || {};
+        // Removed performance-based damping since we removed FPS limitations
+        const dampingFactor = 0.97; // Use consistent damping factor
         state.Matter.Body.setAngularVelocity(body, currentAngVel * dampingFactor);
     } else if (speed < 0.5) {
         state.Matter.Body.setAngularVelocity(body, 0);

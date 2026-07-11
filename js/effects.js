@@ -8,8 +8,8 @@ export class ScreenShake {
     constructor() { this.intensity = 0; this.x = 0; this.y = 0; }
     trigger(amount) { 
         // Scale shake intensity based on performance
-        const perfConfig = window.PERFORMANCE_CONFIG || { maxFPS: 60 };
-        const intensityScale = perfConfig.maxFPS > 45 ? 1.0 : perfConfig.maxFPS > 30 ? 0.7 : 0.4;
+        const perfConfig = window.PERFORMANCE_CONFIG || {};
+        const intensityScale = 1.0; // Remove FPS-based scaling since we removed the cap
         this.intensity = Math.max(this.intensity, amount * intensityScale); 
     }
     update(dt) {
@@ -39,8 +39,8 @@ export class AmbientMote {
     }
     update(dt, time) {
         // On low-performance devices, reduce calculation frequency
-        const perfConfig = window.PERFORMANCE_CONFIG || { maxFPS: 60 };
-        const calcFreq = perfConfig.maxFPS > 30 ? 1 : 0.7; // Reduce calculations on low-end devices
+        const perfConfig = window.PERFORMANCE_CONFIG || {};
+        const calcFreq = 1.0; // Remove FPS-based calculation frequency reduction
         
         this.x += (this.vx + Math.sin(time + this.phase) * 3) * dt * calcFreq;
         this.y += this.vy * dt * calcFreq;
@@ -48,9 +48,8 @@ export class AmbientMote {
         if (this.life <= 0 || this.y < VASE.t - 10) this.reset();
     }
     draw(ctx, time) {
-        // Early exit for low-performance devices
-        const perfConfig = window.PERFORMANCE_CONFIG || { maxFPS: 60 };
-        if (perfConfig.maxFPS < 25) return; // Skip drawing if FPS is very low
+        // Early exit for low-performance devices - removed FPS check since we removed the cap
+        const perfConfig = window.PERFORMANCE_CONFIG || {};
         
         const fade = Math.min(1, this.life / (this.maxLife * .3));
         const a = this.alpha * fade;
@@ -59,13 +58,26 @@ export class AmbientMote {
         const s = this.size * pulse;
         const g = ctx.createRadialGradient(this.x, this.y, 0, this.x, this.y, s);
         g.addColorStop(0, `rgba(255,255,230,${a})`);
-        g.addColorStop(1, `rgba(255,255,230,0)`);
-        ctx.fillStyle = g;
-        ctx.beginPath(); ctx.arc(this.x, this.y, s, 0, TAU); ctx.fill();
     }
-    // Метод для очистки ресурсов при перезапуске игры
-    cleanup() {
-        // В этом классе нет ресурсов, требующих специальной очистки
-        // Но если бы были, например, ссылки на DOM-элементы или таймеры, их следовало бы освободить здесь
+}
+
+export function createAmbientMotes(ctx, perfConfig = {}) {
+    // Use performance configuration with fallback values
+    const config = {
+        maxParticles: 500,
+        ambientMotes: 15,
+        ...perfConfig
+    };
+    
+    // Introduce intensity scaling based on performance level
+    const intensityScale = 1.0; // Remove FPS-based scaling since we removed the cap
+    
+    // Create ambient motes with performance-based quantity
+    const moteCount = Math.floor((config.ambientMotes || 15) * intensityScale);
+    
+    const motes = [];
+    for (let i = 0; i < moteCount; i++) {
+        motes.push(new AmbientMote());
     }
+    return motes;
 }

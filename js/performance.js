@@ -8,7 +8,6 @@ export class PerformanceOptimizer {
         this.isMobile = /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
         
         this.perfConfig = window.PERFORMANCE_CONFIG || { 
-            maxFPS: this.isMobile ? 30 : 60,  // Lower default FPS for mobile
             maxParticles: 500, 
             ambientMotes: 15,
             mergeCheckFreq: 2,
@@ -19,7 +18,7 @@ export class PerformanceOptimizer {
         this.lastAdjustment = performance.now();
         this.adjustmentInterval = 5000; // Adjust every 5 seconds
         this.fpsHistory = [];
-        this.targetFPS = this.perfConfig.maxFPS;
+        this.targetFPS = Infinity; // Remove FPS cap
         this.frameSkipCounter = 0;
         this.frameSkipThreshold = 0; // Will be calculated dynamically
         this.batteryLevel = null;
@@ -29,8 +28,13 @@ export class PerformanceOptimizer {
         
         // Setup battery status listener if available
         this.setupBatteryMonitoring();
+        
+        // Setup visibility change listener
+        document.addEventListener('visibilitychange', () => {
+            perfOptimizer.handleVisibilityChange();
+        });
     }
-    
+
     // Initialize performance configuration based on device type
     initializePerformanceConfig() {
         // Apply more aggressive limits for mobile devices
@@ -172,7 +176,7 @@ export class PerformanceOptimizer {
     // Set quality level and adjust corresponding parameters
     setQualityLevel(level) {
         this.qualityLevel = level;
-        const baseConfig = window.PERFORMANCE_CONFIG || { maxFPS: 60 };
+        const baseConfig = window.PERFORMANCE_CONFIG || { maxParticles: 500, ambientMotes: 15, mergeCheckFreq: 2, maxFlowersForMerges: 60 };
         
         switch(level) {
             case 'high':
@@ -188,8 +192,7 @@ export class PerformanceOptimizer {
                     maxParticles: Math.floor((baseConfig.maxParticles || 500) * 0.6), 
                     ambientMotes: Math.floor((baseConfig.ambientMotes || 15) * 0.6), 
                     mergeCheckFreq: (baseConfig.mergeCheckFreq || 2) + 1,
-                    maxFlowersForMerges: Math.floor((baseConfig.maxFlowersForMerges || 60) * 0.6),
-                    maxFPS: Math.min(baseConfig.maxFPS || 60, this.isMobile ? 30 : 45)
+                    maxFlowersForMerges: Math.floor((baseConfig.maxFlowersForMerges || 60) * 0.6)
                 };
                 break;
             case 'low':
@@ -197,8 +200,7 @@ export class PerformanceOptimizer {
                     maxParticles: Math.floor((baseConfig.maxParticles || 500) * 0.3), 
                     ambientMotes: Math.max(1, Math.floor((baseConfig.ambientMotes || 15) * 0.2)), 
                     mergeCheckFreq: (baseConfig.mergeCheckFreq || 2) + 2,
-                    maxFlowersForMerges: Math.floor((baseConfig.maxFlowersForMerges || 60) * 0.3),
-                    maxFPS: Math.min(baseConfig.maxFPS || 60, this.isMobile ? 20 : 30)
+                    maxFlowersForMerges: Math.floor((baseConfig.maxFlowersForMerges || 60) * 0.3)
                 };
                 break;
         }
@@ -249,12 +251,12 @@ export class PerformanceOptimizer {
     
     // Calculate frame skip threshold based on current performance
     calculateFrameSkipThreshold(currentFPS) {
-        const target = this.perfConfig.maxFPS || 60;
-        if (currentFPS < target * 0.4) {
+        // With unlimited FPS, skip threshold is based on performance rather than fixed FPS limit
+        if (currentFPS < 20) {
             this.frameSkipThreshold = 0.6; // Skip 60% of frames on severe performance issues
-        } else if (currentFPS < target * 0.6) {
+        } else if (currentFPS < 30) {
             this.frameSkipThreshold = 0.4; // Skip 40% of frames
-        } else if (currentFPS < target * 0.8) {
+        } else if (currentFPS < 45) {
             this.frameSkipThreshold = 0.2; // Skip 20% of frames
         } else {
             this.frameSkipThreshold = 0; // Don't skip frames
@@ -264,11 +266,30 @@ export class PerformanceOptimizer {
     // Pause expensive operations when tab is not visible
     handleVisibilityChange() {
         if (document.hidden) {
-            // Reduce update frequency when tab is not visible
-            window.PERFORMANCE_CONFIG.maxFPS = Math.min(15, this.perfConfig.maxFPS);
+            // Reduce particle count when tab is hidden
+            if (state.particles) {
+                state.particles.maxParticles = Math.floor(state.particles.maxParticles * 0.5);
+            }
         } else {
-            // Return to normal performance when tab becomes visible
-            this.setQualityLevel(this.qualityLevel);
+            // Restore original particle count based on current quality level
+            if (state.particles && window.PERFORMANCE_CONFIG) {
+                const baseConfig = window.PERFORMANCE_CONFIG;
+                let particleMultiplier = 1;
+                
+                switch(this.qualityLevel) {
+                    case 'high':
+                        particleMultiplier = 1;
+                        break;
+                    case 'medium':
+                        particleMultiplier = 0.6;
+                        break;
+                    case 'low':
+                        particleMultiplier = 0.3;
+                        break;
+                }
+                
+                state.particles.maxParticles = Math.floor(baseConfig.maxParticles * particleMultiplier);
+            }
         }
     }
 }
@@ -336,11 +357,6 @@ export class MemoryManager {
 export const perfOptimizer = new PerformanceOptimizer();
 export const effectCuller = new EffectCuller();
 export const memoryManager = new MemoryManager();
-
-// Setup visibility change listener
-document.addEventListener('visibilitychange', () => {
-    perfOptimizer.handleVisibilityChange();
-});
 
 // Setup page hide listener for mobile optimization
 window.addEventListener('pagehide', () => {

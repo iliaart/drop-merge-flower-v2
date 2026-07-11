@@ -39,7 +39,7 @@ let lastPerformanceCheck = 0;
 function getPerformanceConfig() {
     const now = Date.now();
     if (!cachedPerformanceConfig || now - lastPerformanceCheck > 1000) { // Cache for 1 second
-        cachedPerformanceConfig = window.PERFORMANCE_CONFIG || { maxFPS: 60, mergeCheckFreq: 2, maxParticles: 500, ambientMotes: 15 };
+        cachedPerformanceConfig = window.PERFORMANCE_CONFIG || { maxParticles: 500, mergeCheckFreq: 2, ambientMotes: 15 };
         lastPerformanceCheck = now;
     }
     return cachedPerformanceConfig;
@@ -687,17 +687,16 @@ window.performMerge = performMerge;
 
 // ─── Game Loop ───────────────────────────────────────────
 function gameLoop(timestamp) {
-    // Performance optimization: skip frames if running behind
-    const currentTime = timestamp;
+    // Get performance configuration
     const perfConfig = getPerformanceConfig();
-    const frameInterval = 1000 / perfConfig.maxFPS;
-    const elapsed = currentTime - lastFrameTime;
     
-    if (elapsed < frameInterval) {
-        requestAnimationFrame(gameLoop);
-        return;
-    }
-    lastFrameTime = currentTime - (elapsed % frameInterval);
+    // Calculate frame interval based on target FPS for render throttling
+    const targetFps = perfConfig.targetFps || 60; // Default to 60fps if not specified
+    const frameInterval = 1000 / targetFps; // Convert fps to ms per frame
+    
+    // Performance optimization: removed FPS cap to allow unlimited frame rate
+    const currentTime = timestamp;
+    lastFrameTime = currentTime;
     
     // Update performance monitor
     perfMonitor.frameCount++;
@@ -1035,7 +1034,7 @@ function checkMerges() {
     if (state.gameState !== 'playing') return;
     
     // Skip merge checks on low-performance devices or if there are too many flowers
-    const perfConfig = window.PERFORMANCE_CONFIG || { maxFPS: 60, maxFlowersForMerges: 50 };
+    const perfConfig = window.PERFORMANCE_CONFIG || { maxFlowersForMerges: 50 };
     if (state.flowers.length > (perfConfig.maxFlowersForMerges || 50)) {
         // Reduce frequency of checks when there are many flowers
         if (Math.floor(state.time * 5) % 3 !== 0) return; // Check every 3 out of 5 frames
@@ -1099,12 +1098,8 @@ function checkMerges() {
     }
 }
 
-// Additional performance optimization function
+// Additional performance optimization function - removed FPS-based skipping since we removed the cap
 function shouldSkipFrame() {
-    const perfConfig = window.PERFORMANCE_CONFIG || { maxFPS: 60 };
-    // On very low performance devices, occasionally skip updates to maintain responsiveness
-    if (perfConfig.maxFPS < 25) {
-        return Math.random() > 0.7; // Skip 30% of frames on very low performance devices
-    }
+    // With unlimited FPS, we don't skip frames based on performance
     return false;
 }

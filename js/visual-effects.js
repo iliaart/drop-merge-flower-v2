@@ -25,8 +25,8 @@ export class BaseEffect {
         
         for (let i = 0; i < count; i++) {
             const angle = rand(0, TAU);
-            const speed = rand(20, 80);
-            const size = rand(1, 4);
+            const speed = rand(20, 180);
+            const size = rand(5, 10);
             
             this.particles.push({
                 x: this.x,
@@ -36,7 +36,7 @@ export class BaseEffect {
                 size: size,
                 life: this.maxLife,
                 color: color,
-                alpha: 1.0
+                alpha: 0.7
             });
         }
     }
@@ -88,7 +88,7 @@ export class MergeRingEffect extends BaseEffect {
         super('mergeRing', x, y, options);
         this.startTime = Date.now();
         this.duration = options.duration || 800;
-        this.maxSize = options.maxSize || 100;
+        this.maxSize = options.maxSize || 200;
         this.canvas = options.canvas || null;
         this.color = options.color || '#ffffff';
     }
@@ -108,7 +108,7 @@ export class MergeRingEffect extends BaseEffect {
         if (progress < 1 && this.canvas) {
             ctx.save();
             // Scale the ring over time to create expanding effect
-            const scale = 0.1 + progress * 1.2; // Scale from 0.1x to 1.3x - more controlled expansion
+            const scale = 0.1 + progress * 2.2; // Scale from 0.1x to 1.3x - more controlled expansion
             const alpha = 1 - progress; // Fade out as time passes
             
             ctx.globalAlpha = alpha;

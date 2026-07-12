@@ -293,27 +293,27 @@ export function drawGameOverWarning(ctx) {
 export function drawLevelProgress(ctx) {
     if (state.gameState !== 'playing') return;
     
-    // Отображение текущего уровня игры
+    // Отображение текущего уровня игры - увеличенный размер шрифта и новое положение в левом верхнем углу
     ctx.save();
     ctx.fillStyle = 'rgba(255,255,255,0.7)';
-    ctx.font = '14px Georgia';
-    ctx.textAlign = 'right';
-    ctx.fillText(`Уровень: ${state.currentGameLevel}`, VASE.r - 10, VASE.t - 40);
+    ctx.font = '28px Georgia'; // Увеличил размер шрифта в 2 раза
+    ctx.textAlign = 'left'; // Выравнивание по левому краю для левого верхнего угла
+    ctx.fillText(`Уровень: ${state.currentGameLevel}`, 20, 30); // Новое положение в левом верхнем углу
     ctx.restore();
     
-    // Отображение прогресса до следующего уровня
+    // Отображение прогресса до следующего уровня - увеличенный размер шрифта и новое положение
     ctx.save();
     ctx.fillStyle = 'rgba(255,255,255,0.6)';
-    ctx.font = '12px Georgia';
-    ctx.textAlign = 'right';
-    ctx.fillText(`Цветы ${state.minRequiredFlowerLevelForGameLevel}+ ур.: ${state.flowersAtMaxLevel}/${state.targetFlowersForNextGameLevel}`, VASE.r - 10, VASE.t - 25);
+    ctx.font = '24px Georgia'; // Увеличил размер шрифта в 2 раза
+    ctx.textAlign = 'left'; // Выравнивание по левому краю для левого верхнего угла
+    ctx.fillText(`Цветы ${state.minRequiredFlowerLevelForGameLevel}+ ур.: ${state.flowersAtMaxLevel}/${state.targetFlowersForNextGameLevel}`, 20, 60); // Новое положение под уровнем
     ctx.restore();
     
-    // Визуализация прогресс-бара
-    const barWidth = 150;
-    const barHeight = 6;
-    const barX = VASE.r - barWidth - 10;
-    const barY = VASE.t - 15;
+    // Визуализация прогресс-бара - увеличенные размеры и новое положение
+    const barWidth = 300; // Удвоенная ширина
+    const barHeight = 12; // Удвоенная высота
+    const barX = 20; // Положение слева
+    const barY = 90; // Положение под текстом
     
     // Фон прогресс-бара
     ctx.save();
@@ -435,4 +435,37 @@ export function drawFlower(ctx, flower, t) {
     ctx.restore();
     
     // Note: Selection indicator is now drawn in the main game loop to ensure proper layering
+}
+
+/** Draw a level announcement in the center of the screen */
+export function drawLevelAnnouncement(ctx) {
+    if (!state.showingLevelAnnouncement) return;
+    
+    const level = state.announcedLevel || state.currentGameLevel;
+    const announcementTime = state.announcementTime || 0;
+    const totalTime = state.announcementDuration || 2000; // 2 seconds by default
+    
+    // Calculate alpha based on remaining time to fade out
+    const fadeStartTime = totalTime * 0.8; // Start fading out during last 20% of duration
+    let alpha = 1.0;
+    if (announcementTime > fadeStartTime) {
+        alpha = 1.0 - ((announcementTime - fadeStartTime) / (totalTime - fadeStartTime));
+        alpha = Math.max(0, alpha);
+    }
+    
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    
+    // Draw background rectangle with semi-transparent fill
+    ctx.fillStyle = 'rgba(20, 10, 30, 0.85)';
+    ctx.fillRect(GW / 2 - 150, GH / 2 - 40, 300, 80);
+    
+    // Draw the level announcement text
+    ctx.fillStyle = '#f0e0e8';
+    ctx.font = 'bold 36px Georgia';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(`Уровень ${level}`, GW / 2, GH / 2);
+    
+    ctx.restore();
 }

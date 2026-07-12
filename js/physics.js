@@ -57,10 +57,10 @@ function onCollision(event) {
     // Phase 1: merge same-level flowers
     event.pairs.forEach(pair => {
         const a = pair.bodyA, b = pair.bodyB;
-        if (a.flowerIdx === undefined || b.flowerIdx === undefined) return;
+        if (!a || !b || a.flowerIdx === undefined || b.flowerIdx === undefined) return;
         if (state.mergingSet.has(a.id) || state.mergingSet.has(b.id)) return;
         const fa = state.flowers[a.flowerIdx], fb = state.flowers[b.flowerIdx];
-        if (!fa || !fb || fa.level !== fb.level) return;
+        if (!fa || !fb || !fa.body || !fb.body || fa.level !== fb.level) return;
         if (fa.level >= allFlowers.length - 1) return;
         // justSpawned intentionally NOT checked — merged flowers should be able to
         // re-merge immediately for Suika-style cascades; mergingSet prevents double merges.
@@ -77,10 +77,10 @@ function onCollision(event) {
 
     event.pairs.forEach(pair => {
         const a = pair.bodyA, b = pair.bodyB;
-        if (a.flowerIdx === undefined || b.flowerIdx === undefined) return;
+        if (!a || !b || a.flowerIdx === undefined || b.flowerIdx === undefined) return;
         if (state.mergingSet.has(a.id) || state.mergingSet.has(b.id)) return;
         const fa = state.flowers[a.flowerIdx], fb = state.flowers[b.flowerIdx];
-        if (!fa || !fb || fa.level === fb.level) return;
+        if (!fa || !fb || !fa.body || !fb.body || fa.level === fb.level) return;
         // Note: spawning flag intentionally NOT checked for repulsion either
         // justSpawned kept here for repulsion to avoid pushing freshly merged flowers
         if (fa.justSpawned || fb.justSpawned) return;
@@ -96,9 +96,13 @@ function onCollision(event) {
 }
 
 function applyRepulsionWithRadii(a, b, fa, fb, radiusA, radiusB) {
+    // Проверяем, что тела существуют перед доступом к их свойствам
+    if (!a || !b || !a.position || !b.position) return;
+    
     const dx = b.position.x - a.position.x;
     const dy = b.position.y - a.position.y;
     const dist = Math.sqrt(dx * dx + dy * dy);
+    
     const minDist = radiusA + radiusB;
 
     if (dist >= minDist || dist <= 0.01) return;
@@ -162,6 +166,9 @@ function applyRepulsionWithRadii(a, b, fa, fb, radiusA, radiusB) {
 }
 
 function capVelocity(body, flower, maxV) {
+    // Проверяем, что тело существует и имеет необходимые свойства
+    if (!body || !body.velocity) return;
+    
     const speed = Math.sqrt(body.velocity.x ** 2 + body.velocity.y ** 2);
     if (speed > maxV) {
         const scale = maxV / speed;
@@ -194,7 +201,7 @@ export function applyForces(dt) {
 
     for (let i = 0; i < state.flowers.length; i += updateStep) {
         const f = state.flowers[i];
-        if (!f) continue;
+        if (!f || !f.body) continue;
         
         // Skip some updates based on probability for additional performance
         if (Math.random() > updateFrequency) continue;
@@ -223,6 +230,9 @@ export function applyForces(dt) {
 }
 
 function updateResonance(f, body, dt, speed, angSpeed) {
+    // Проверяем, что тело существует
+    if (!body) return;
+    
     if (f.isForcedStopped) {
         f.stopTimer -= dt;
         if (f.stopTimer <= 0) {
@@ -268,9 +278,12 @@ function applyVibrationBuoyancy(f, body, flowerRadius, avgRadius) {
 
     let vibrationForce = 0;
     for (const other of state.flowers) {
-        if (!other || other === f) continue;
+        if (!other || !other.body || other === f) continue;
         const otherSpeed = Math.sqrt(other.body.velocity.x ** 2 + other.body.velocity.y ** 2);
         if (otherSpeed > 2) {
+            // Проверяем, что оба тела существуют и имеют позиции
+            if (!body || !body.position || !other.body || !other.body.position) continue;
+            
             const dx = body.position.x - other.body.position.x;
             const dy = body.position.y - other.body.position.y;
             const dist = Math.sqrt(dx * dx + dy * dy);
@@ -282,13 +295,19 @@ function applyVibrationBuoyancy(f, body, flowerRadius, avgRadius) {
     if (vibrationForce > 0) {
         const lightnessFactor = 1 - (flowerRadius / (avgRadius * 0.8));
         const upwardForce = vibrationForce * VIBRATION_STRENGTH * lightnessFactor;
-        state.Matter.Body.applyForce(body, body.position, { x: 0, y: -upwardForce });
+        // Проверяем, что тело существует перед применением силы
+        if (body && body.position) {
+            state.Matter.Body.applyForce(body, body.position, { x: 0, y: -upwardForce });
+        }
     }
 }
 
 /** Angular velocity management — smooth rotation, damping, limits */
 export function updateAngularVelocity(f) {
     const body = f.body;
+    // Проверяем, что тело существует и имеет необходимые свойства
+    if (!body || !body.angularVelocity || !body.velocity) return;
+    
     const currentAngVel = body.angularVelocity;
     const angVelThreshold = 0.002;
     const speed = Math.sqrt(body.velocity.x ** 2 + body.velocity.y ** 2);

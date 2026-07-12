@@ -87,13 +87,16 @@ export function checkMerges() {
         const flowerAData = allFlowers[fa.level];
         const radiusA = flowerAData.flowerType === 'orchid' ? flowerAData.radius * 0.5 : flowerAData.radius;
         
-        grid.add({flower: fa, index: i, radius: radiusA}, fa.body.position.x, fa.body.position.y);
+        // Проверяем, что тело существует перед использованием его позиции
+        if (fa.body) {
+            grid.add({flower: fa, index: i, radius: radiusA}, fa.body.position.x, fa.body.position.y);
+        }
     }
     
     // Check for collisions using spatial grid
     for (let i = 0; i < state.flowers.length; i++) {
         const fa = state.flowers[i];
-        if (!fa) continue;
+        if (!fa || !fa.body) continue;
         
         // Get the actual collision radius for flower a (accounting for orchid reduction)
         const flowerAData = allFlowers[fa.level];
@@ -109,7 +112,7 @@ export function checkMerges() {
             const fb = nearby.flower;
             const j = nearby.index;
             
-            if (!fb || i >= j) continue; // Avoid duplicate checks and self-checks
+            if (!fb || !fb.body || i >= j) continue; // Avoid duplicate checks and self-checks
             if (!fb || fa.level !== fb.level) continue;
             if (state.mergingSet.has(fb.body.id)) continue;
             

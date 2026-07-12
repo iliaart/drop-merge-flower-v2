@@ -113,7 +113,7 @@ export function restart() {
         flowerPool.release(f);
     });
 
-    state.flowers.forEach(f => { if (f) state.Matter.World.remove(state.world, f.body); });
+    state.flowers.forEach(f => { if (f && f.body) state.Matter.World.remove(state.world, f.body); });
     state.flowers = [];
     state.mergingSet.clear();
     // Initialize particles with performance configuration
@@ -254,7 +254,7 @@ export function checkGameOver(dt) {
 
     let outOfBoundsCount = 0;
     for (const f of state.flowers) {
-        if (!f) continue;
+        if (!f || !f.body) continue;
         if (f.body.position.y < VASE.t - 20) outOfBoundsCount++;
     }
     state.outOfBoundsCount = outOfBoundsCount;

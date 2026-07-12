@@ -333,6 +333,9 @@ export function drawFPS(ctx) {
 
 /** Draw a single flower (with squash/stretch, glow, stamens) */
 export function drawFlower(ctx, flower, t) {
+    // Проверяем, что тело существует
+    if (!flower || !flower.body) return;
+    
     const allFlowers = getAllFlowersWithGenerated();
     const f = allFlowers[flower.level];
     if (!f) return; // Exit early if flower data doesn't exist

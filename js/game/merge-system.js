@@ -30,7 +30,7 @@ export async function autoMergeExcessTypes() {
     // Collect all flowers at the lowest level, sorted by Y (lowest first)
     const lowestFlowers = state.flowers
         .map((f, idx) => ({ f, idx }))
-        .filter(({ f }) => f && f.level === lowestLevel && !f.justSpawned && !f.spawning)
+        .filter(({ f }) => f && f.body && f.level === lowestLevel && !f.justSpawned && !f.spawning)
         .sort((a, b) => b.f.body.position.y - a.f.body.position.y);
 
     if (lowestFlowers.length < 2) return;
@@ -38,7 +38,7 @@ export async function autoMergeExcessTypes() {
     // Merge the two lowest flowers at this level
     const { f: fa, idx: idxA } = lowestFlowers[0];
     const { f: fb, idx: idxB } = lowestFlowers[1];
-    if (state.mergingSet.has(fa.body.id) || state.mergingSet.has(fb.body.id)) return;
+    if (!fa || !fb || state.mergingSet.has(fa.body.id) || state.mergingSet.has(fb.body.id)) return;
 
     if (typeof window.performMerge === 'function') {
         window.performMerge(fa, fb, idxA, idxB);
@@ -55,13 +55,13 @@ export function forceOverlapMerges() {
     const allFlowers = getAllFlowersWithGenerated();
     for (let i = 0; i < state.flowers.length; i++) {
         const fa = state.flowers[i];
-        if (!fa) continue;
+        if (!fa || !fa.body) continue;
         // Get the actual collision radius for flower a (accounting for orchid reduction)
         const flowerAData = allFlowers[fa.level];
         const radiusA = flowerAData.flowerType === 'orchid' ? flowerAData.radius * 0.5 : flowerAData.radius;
         for (let j = i + 1; j < state.flowers.length; j++) {
             const fb = state.flowers[j];
-            if (!fb) continue;
+            if (!fb || !fb.body) continue;
             if (fa.level !== fb.level || fa.level >= allFlowers.length - 1) continue;
             if (state.mergingSet.has(fa.body.id) || state.mergingSet.has(fb.body.id)) continue;
 
@@ -83,7 +83,7 @@ export function forceOverlapMerges() {
 }
 
 export function performMerge(fa, fb, idxA, idxB) {
-    if (!fa || !fb) return;
+    if (!fa || !fb || !fa.body || !fb.body) return;
 
     state.mergingSet.add(fa.body.id);
     state.mergingSet.add(fb.body.id);
@@ -153,8 +153,8 @@ function startLevelTransition() {
             // Добавляем информацию о цветке для последующего "падения"
             state.flowersToDrop.push({
                 level: f.level,
-                x: f.body.position.x,
-                y: f.body.position.y
+                x: f.body && f.body.position ? f.body.position.x : f.x || 0,  // безопасный доступ к координате
+                y: f.body && f.body.position ? f.body.position.y : f.y || 0   // безопасный доступ к координате
             });
         }
     }

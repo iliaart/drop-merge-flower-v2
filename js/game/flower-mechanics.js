@@ -82,7 +82,10 @@ export function removeFlower(idx) {
     if (f.timeoutId) {
         clearTimeout(f.timeoutId);
     }
-    state.Matter.World.remove(state.world, f.body);
+    // Проверяем, что тело существует перед его удалением
+    if (f.body) {
+        state.Matter.World.remove(state.world, f.body);
+    }
     
     // Return the flower object to the pool for reuse
     flowerPool.release(f);
@@ -92,7 +95,11 @@ export function removeFlower(idx) {
 
 export function cleanupFlowers() {
     state.flowers = state.flowers.filter(f => f !== null);
-    state.flowers.forEach((f, i) => { f.body.flowerIdx = i; });
+    state.flowers.forEach((f, i) => { 
+        if (f && f.body) {
+            f.body.flowerIdx = i; 
+        }
+    });
 }
 
 export function dropFlower() {

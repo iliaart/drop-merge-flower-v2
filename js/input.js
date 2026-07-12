@@ -50,7 +50,7 @@ export function screenToGame(sx, sy) {
 function getFlowerAtPosition(x, y) {
     for (let i = 0; i < state.flowers.length; i++) {
         const flower = state.flowers[i];
-        if (!flower) continue;
+        if (!flower || !flower.body) continue;
         
         const pos = flower.body.position;
         const allFlowers = getAllFlowersWithGenerated();
@@ -112,6 +112,9 @@ export function setupInput() {
     
     // Function to smoothly move flower toward target position using forces
     function moveFlowerToPosition(flowerBody, targetX, targetY) {
+        // Проверяем, что тело существует
+        if (!flowerBody) return;
+        
         // Get current position
         const currentPos = flowerBody.position;
         
@@ -145,6 +148,9 @@ export function setupInput() {
         // Handle flower dragging
         if (state.isDragging && state.selectedFlower) {
             const flowerBody = state.selectedFlower.body;
+            // Добавляем проверку на существование тела
+            if (!flowerBody) return;
+            
             const allFlowers = getAllFlowersWithGenerated();
             const flowerData = allFlowers[state.selectedFlower.level];
             const radius = flowerData.radius;
@@ -209,6 +215,13 @@ export function setupInput() {
             state.isDragging = true;
             // Disable gravity and make the flower kinematic when dragging starts
             const flowerBody = clickedFlower.body;
+            // Проверяем, что тело существует
+            if (!flowerBody) {
+                state.isDragging = false;
+                state.selectedFlower = null;
+                return;
+            }
+            
             // Store original gravity scale to restore later
             clickedFlower.originalGravityScale = flowerBody.gravityScale;
             flowerBody.gravityScale = 0;
@@ -239,6 +252,13 @@ export function setupInput() {
             // Get the current flower that was being dragged
             const flowerBeingDragged = state.selectedFlower;
             const flowerBody = flowerBeingDragged.body;
+            
+            // Проверяем, что тело существует перед работой с ним
+            if (!flowerBody) {
+                state.isDragging = false;
+                state.selectedFlower = null;
+                return;
+            }
             
             // Store the current rotation state before destroying the flower
             const currentAngle = flowerBody.angle;
@@ -318,6 +338,13 @@ export function setupInput() {
             state.isDragging = true;
             // Disable gravity and make the flower kinematic when dragging starts
             const flowerBody = touchedFlower.body;
+            // Проверяем, что тело существует
+            if (!flowerBody) {
+                state.isDragging = false;
+                state.selectedFlower = null;
+                return;
+            }
+            
             // Store original gravity scale to restore later
             touchedFlower.originalGravityScale = flowerBody.gravityScale;
             flowerBody.gravityScale = 0;
@@ -352,6 +379,9 @@ export function setupInput() {
         // Handle dragging during touch move
         if (state.isDragging && state.selectedFlower) {
             const flowerBody = state.selectedFlower.body;
+            // Добавляем проверку на существование тела
+            if (!flowerBody) return;
+            
             const allFlowers = getAllFlowersWithGenerated();
             const flowerData = allFlowers[state.selectedFlower.level];
             const radius = flowerData.radius;
@@ -378,6 +408,13 @@ export function setupInput() {
             // Get the current flower that was being dragged
             const flowerBeingDragged = state.selectedFlower;
             const flowerBody = flowerBeingDragged.body;
+            
+            // Проверяем, что тело существует перед работой с ним
+            if (!flowerBody) {
+                state.isDragging = false;
+                state.selectedFlower = null;
+                return;
+            }
             
             // Store the current rotation state before destroying the flower
             const currentAngle = flowerBody.angle;

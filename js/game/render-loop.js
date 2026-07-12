@@ -14,6 +14,9 @@ const { VASE, DROP_Y } = CONFIG;
  * @param {number} currentTime - Current timestamp
  */
 export function updateFlowerTail(flower, currentTime) {
+    // Проверяем, что тело существует
+    if (!flower || !flower.body) return;
+    
     // Update the tail if the flower is selected and being dragged OR if it's kinematic (physics-driven motion)
     // According to specification: kinematic state is determined by Matter.Body.getStatic returning false
     const hasMatterBody = state.Matter && state.Matter.Body && typeof state.Matter.Body.getStatic === 'function';

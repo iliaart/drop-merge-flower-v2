@@ -272,24 +272,20 @@ export class VisualEffectManager {
     
     // Create merge particles
     createMergeEffect(x, y, level, colorA, colorB) {
-        // Use colors of the merging flowers if provided, otherwise get from new flower
-        let petalColorA, petalColorB;
+        const allFlowers = getAllFlowersWithGenerated();
+        const f = allFlowers[level];
+        if (!f) return;
+        
+        // Use colors of the merging flowers for particles if provided
+        let particleColor = f.petalColor; // Default to new flower's color
         
         if (colorA && colorB) {
-            // Use the provided colors from the merging flowers
-            petalColorA = colorA;
-            petalColorB = colorB;
-        } else {
-            // Fallback to getting colors from the new flower if colors not provided
-            const allFlowers = getAllFlowersWithGenerated();
-            const f = allFlowers[level];
-            const defaultColor = f ? f.petalColor : '#FFAABB';
-            petalColorA = defaultColor;
-            petalColorB = defaultColor;
+            // Blend the two colors of merging flowers for particles
+            particleColor = this.blendColors(colorA, colorB);
         }
         
-        // Blend the two colors for a combined effect
-        const blendedColor = this.blendColors(petalColorA, petalColorB);
+        // Use the new flower's color for rings
+        const ringColor = f.petalColor || '#FFAABB';
         
         // Reduce effect intensity on lower performance devices - removed since we removed FPS limitations
         const perfConfig = window.PERFORMANCE_CONFIG || {};
@@ -298,19 +294,19 @@ export class VisualEffectManager {
         // Create primary particles - more intense and longer lasting
         this.addEffect('merge', x, y, {
             count: Math.floor(12 * intensity), // Increased from 8
-            color: blendedColor, // Use blended color of both merging flowers
+            color: particleColor, // Use blended color of merging flowers for particles
             life: 1.2 // Increased from 0.8 for more visibility
         });
         
         // Create secondary particles - also enhanced
         this.addEffect('merge', x, y, {
             count: Math.floor(8 * intensity), // Increased from 5
-            color: lightenColor(blendedColor, 0.3), // Lighter version of the blended color
+            color: lightenColor(particleColor, 0.3), // Lighter version of the merging flowers' blended color
             life: 0.8 // Increased from 0.5 for more visibility
         });
 
         // Create additional ring effect for merge - more prominent and closer to merge location
-        this.createMergeRingEffect(x, y, blendedColor); // Pass the blended color to the ring
+        this.createMergeRingEffect(x, y, ringColor); // Pass the new flower's color to the ring
     }
     
     // Helper method to blend two colors
@@ -376,8 +372,17 @@ export class VisualEffectManager {
         return { r: 255, g: 170, b: 188 }; // Default pink color
     }
     
-    // Create additional ring effect for merge events
+    // Create a special ring effect for merge events
     createMergeRingEffect(x, y, color) {
+        // Validate coordinates to ensure they are reasonable numbers and within bounds
+        if (typeof x !== 'number' || typeof y !== 'number' || 
+            isNaN(x) || isNaN(y) || 
+            Math.abs(x) > 10000 || Math.abs(y) > 10000) {
+            // Use a default position if coordinates are invalid
+            console.warn("Invalid coordinates for merge ring effect:", x, y);
+            return;
+        }
+        
         // Create a temporary canvas for the ring effect
         const ringCanvas = document.createElement('canvas');
         const ringCtx = ringCanvas.getContext('2d');
@@ -610,16 +615,4 @@ function parseColorString(colorStr) {
     }
     // Default fallback
     return { r: 255, g: 170, b: 188 }; // Default pink color
-}
-
-// Helper function to convert RGB object to hex string
-function rgbToHex(rgbObj) {
-    const r = Math.max(0, Math.min(255, Math.floor(rgbObj.r)));
-    const g = Math.max(0, Math.min(255, Math.floor(rgbObj.g)));
-    const b = Math.max(0, Math.min(255, Math.floor(rgbObj.b)));
-    
-    return '#' + 
-        r.toString(16).padStart(2, '0') +
-        g.toString(16).padStart(2, '0') +
-        b.toString(16).padStart(2, '0');
 }

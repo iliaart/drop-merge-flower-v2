@@ -1,0 +1,397 @@
+/* =============================================================================
+ *                    СТИЛИ ДЛЯ ТАБЛИЦЫ ЛИДЕРБОРДА
+ * =============================================================================
+ *
+ * Эти стили оформляют таблицу рекордов в современном игровом стиле.
+ * Они автоматически применяются к DOM-элементам, которые создаёт
+ * класс Leaderboard из файла leaderboard.js.
+ *
+ * =============================================================================
+ * ПОДКЛЮЧЕНИЕ
+ * =============================================================================
+ *
+ *  <link rel="stylesheet" href="leaderboard.css">
+ *
+ * =============================================================================
+ * СТРУКТУРА ЭЛЕМЕНТОВ
+ * =============================================================================
+ *
+ *  #leaderboard-container          — контейнер (должен быть на странице)
+ *    └── .ldb-overlay              — затемнённый фон (оверлей)
+ *         └── .ldb-panel           — панель с таблицей
+ *              ├── .ldb-header     — заголовок + кнопка закрытия
+ *              ├── .ldb-list       — список записей
+ *              │    └── .ldb-row   — одна строка (игрок/бот)
+ *              │         ├── .ldb-medal   — медаль/номер
+ *              │         ├── .ldb-avatar  — аватарка
+ *              │         ├── .ldb-name    — имя
+ *              │         └── .ldb-score   — очки
+ *              └── .ldb-footer     — подвал (информация)
+ *
+ *  .ldb-new-best                   — анимация "Новый рекорд!"
+ *
+ * =============================================================================
+ */
+
+/* ─── Переменные (настройте под свою игру) ───────────────────────────────── */
+:root {
+  --ldb-primary: #FFD700;          /* Золотой — основной цвет */
+  --ldb-accent: #FF6B35;           /* Оранжевый — акцент */
+  --ldb-bg: rgba(0, 0, 0, 0.85);  /* Фон оверлея */
+  --ldb-panel-bg: #1a1a2e;        /* Фон панели */
+  --ldb-panel-border: #16213e;     /* Рамка панели */
+  --ldb-text: #ffffff;             /* Основной текст */
+  --ldb-text-secondary: #a0a0b0;  /* Второстепенный текст */
+  --ldb-row-bg: rgba(255, 255, 255, 0.05);  /* Фон строки */
+  --ldb-row-hover: rgba(255, 255, 255, 0.1); /* Фон строки при наведении */
+  --ldb-player-bg: rgba(255, 215, 0, 0.15);  /* Фон строки игрока */
+  --ldb-player-border: #FFD700;    /* Рамка строки игрока */
+  --ldb-font: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  --ldb-radius: 12px;             /* Скругление углов */
+}
+
+/* ─── Оверлей (затемнённый фон) ──────────────────────────────────────────── */
+.ldb-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: var(--ldb-bg);
+  display: none;                   /* Скрыт по умолчанию */
+  justify-content: center;
+  align-items: center;
+  z-index: 9999;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  backdrop-filter: blur(4px);      /* Размытие фона (современно) */
+  -webkit-backdrop-filter: blur(4px);
+}
+
+/* Показываем оверлей */
+.ldb-overlay--visible {
+  opacity: 1;
+}
+
+/* ─── Панель с таблицей ──────────────────────────────────────────────────── */
+.ldb-panel {
+  background: var(--ldb-panel-bg);
+  border: 2px solid var(--ldb-panel-border);
+  border-radius: var(--ldb-radius);
+  width: 90%;
+  max-width: 500px;
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+  transform: scale(0.8) translateY(20px);
+  transition: transform 0.3s ease, opacity 0.3s ease;
+  opacity: 0;
+  overflow: hidden;
+}
+
+/* Показываем панель (анимация появления) */
+.ldb-panel--visible {
+  transform: scale(1) translateY(0);
+  opacity: 1;
+}
+
+/* ─── Заголовок ──────────────────────────────────────────────────────────── */
+.ldb-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  background: linear-gradient(135deg, #16213e, #0f3460);
+}
+
+.ldb-title {
+  margin: 0;
+  font-family: var(--ldb-font);
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: var(--ldb-primary);
+  text-shadow: 0 0 10px rgba(255, 215, 0, 0.3);
+  letter-spacing: 1px;
+}
+
+/* Кнопка закрытия */
+.ldb-close-btn {
+  background: none;
+  border: none;
+  color: var(--ldb-text-secondary);
+  font-size: 1.5rem;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 6px;
+  transition: background 0.2s, color 0.2s;
+  line-height: 1;
+}
+
+.ldb-close-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+}
+
+/* ─── Список записей ─────────────────────────────────────────────────────── */
+.ldb-list {
+  flex: 1;
+  overflow-y: auto;               /* Прокрутка, если записей много */
+  padding: 8px 0;
+}
+
+/* Стилизация скроллбара (для WebKit-браузеров) */
+.ldb-list::-webkit-scrollbar {
+  width: 6px;
+}
+
+.ldb-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.ldb-list::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 3px;
+}
+
+.ldb-list::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+/* ─── Строка таблицы ─────────────────────────────────────────────────────── */
+.ldb-row {
+  display: flex;
+  align-items: center;
+  padding: 10px 20px;
+  margin: 2px 8px;
+  border-radius: 8px;
+  background: var(--ldb-row-bg);
+  transition: background 0.2s, transform 0.15s;
+  font-family: var(--ldb-font);
+  color: var(--ldb-text);
+  gap: 12px;
+}
+
+/* Эффект при наведении */
+.ldb-row:hover {
+  background: var(--ldb-row-hover);
+  transform: translateX(4px);
+}
+
+/* Строка текущего игрока — выделяется золотом */
+.ldb-row--player {
+  background: var(--ldb-player-bg);
+  border: 1px solid var(--ldb-player-border);
+  box-shadow: 0 0 12px rgba(255, 215, 0, 0.2);
+}
+
+.ldb-row--player:hover {
+  background: rgba(255, 215, 0, 0.2);
+}
+
+/* ─── Медаль / номер места ───────────────────────────────────────────────── */
+.ldb-medal {
+  width: 36px;
+  text-align: center;
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--ldb-text-secondary);
+  flex-shrink: 0;
+}
+
+/* ─── Аватарка ────────────────────────────────────────────────────────────── */
+.ldb-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+  border: 2px solid rgba(255, 255, 255, 0.15);
+}
+
+/* Аватарка по умолчанию (если нет фото) */
+.ldb-avatar--default {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.1);
+  font-size: 1.2rem;
+  border: 2px solid rgba(255, 255, 255, 0.1);
+}
+
+/* ─── Имя игрока ──────────────────────────────────────────────────────────── */
+.ldb-name {
+  flex: 1;
+  font-size: 0.95rem;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;        /* Если имя длинное — обрезаем */
+}
+
+/* ─── Очки ────────────────────────────────────────────────────────────────── */
+.ldb-score {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--ldb-primary);
+  text-align: right;
+  flex-shrink: 0;
+  min-width: 60px;
+}
+
+/* ─── Подвал ──────────────────────────────────────────────────────────────── */
+.ldb-footer {
+  padding: 10px 20px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  text-align: center;
+  font-family: var(--ldb-font);
+  font-size: 0.8rem;
+  color: var(--ldb-text-secondary);
+}
+
+/* =============================================================================
+ *                    АНИМАЦИЯ "НОВЫЙ РЕКОРД!"
+ * =============================================================================
+ */
+
+.ldb-new-best {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 10000;
+  pointer-events: none;            /* Не блокирует клики */
+}
+
+.ldb-new-best-content {
+  text-align: center;
+  animation: ldb-new-best-pop 0.5s ease forwards;
+  opacity: 0;
+  transform: scale(0.3);
+}
+
+.ldb-new-best--visible .ldb-new-best-content {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.ldb-new-best--hiding .ldb-new-best-content {
+  opacity: 0;
+  transform: scale(1.5);
+  transition: opacity 0.4s ease, transform 0.4s ease;
+}
+
+.ldb-new-best-star {
+  font-size: 4rem;
+  animation: ldb-star-spin 1s ease infinite;
+  margin-bottom: 10px;
+}
+
+.ldb-new-best-text {
+  font-family: var(--ldb-font);
+  font-size: 2.5rem;
+  font-weight: 900;
+  color: var(--ldb-primary);
+  text-shadow:
+    0 0 20px rgba(255, 215, 0, 0.8),
+    0 0 40px rgba(255, 215, 0, 0.4),
+    0 4px 8px rgba(0, 0, 0, 0.5);
+  letter-spacing: 4px;
+  margin-bottom: 8px;
+}
+
+.ldb-new-best-score {
+  font-family: var(--ldb-font);
+  font-size: 2rem;
+  font-weight: 700;
+  color: #fff;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+}
+
+/* ─── Ключевые кадры анимации ────────────────────────────────────────────── */
+
+@keyframes ldb-new-best-pop {
+  0% {
+    opacity: 0;
+    transform: scale(0.3);
+  }
+  60% {
+    opacity: 1;
+    transform: scale(1.1);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes ldb-star-spin {
+  0% {
+    transform: rotate(0deg) scale(1);
+  }
+  50% {
+    transform: rotate(180deg) scale(1.2);
+  }
+  100% {
+    transform: rotate(360deg) scale(1);
+  }
+}
+
+/* =============================================================================
+ *                    АДАПТАЦИЯ ПОД МОБИЛЬНЫЕ УСТРОЙСТВА
+ * =============================================================================
+ */
+
+@media (max-width: 480px) {
+  .ldb-panel {
+    width: 95%;
+    max-height: 90vh;
+    border-radius: 8px;
+  }
+
+  .ldb-title {
+    font-size: 1.1rem;
+  }
+
+  .ldb-row {
+    padding: 8px 12px;
+    margin: 2px 4px;
+    gap: 8px;
+  }
+
+  .ldb-medal {
+    width: 28px;
+    font-size: 0.9rem;
+  }
+
+  .ldb-avatar {
+    width: 30px;
+    height: 30px;
+  }
+
+  .ldb-name {
+    font-size: 0.85rem;
+  }
+
+  .ldb-score {
+    font-size: 0.9rem;
+    min-width: 50px;
+  }
+
+  .ldb-new-best-text {
+    font-size: 1.8rem;
+  }
+
+  .ldb-new-best-score {
+    font-size: 1.5rem;
+  }
+
+  .ldb-new-best-star {
+    font-size: 3rem;
+  }
+}

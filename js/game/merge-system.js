@@ -116,7 +116,7 @@ export function performMerge(fa, fb, idxA, idxB) {
             state.selectedFlower = nf;
             // Set isDragging to true so the player can continue moving the flower
             state.isDragging = true;
-            
+                
             // Ensure the new flower has the correct physical properties for dragging
             // Store original gravity scale and make kinematic during drag
             nf.originalGravityScale = 0;  // Initially 0 since we're dragging
@@ -124,16 +124,17 @@ export function performMerge(fa, fb, idxA, idxB) {
             state.Matter.Body.setStatic(nf.body, true);  // Make kinematic during drag
         }
 
-        // Create merge effect with colors of the merging flowers
+        // Create merge effect with the color of the new flower for rings
+        // and with the colors of the merging flowers for particles
         visualEffects.createMergeEffect(mx, my, newLevel, colorA, colorB);
         state.shake.trigger(6 + newLevel * 2);
         state.audio.playMerge(newLevel);
         if (newLevel > state.highestLevel) state.highestLevel = newLevel;
-        
+            
         // Проверка системы уровней: если новый цветок достиг минимально требуемого уровня для текущего игрового уровня
         if (newLevel >= state.minRequiredFlowerLevelForGameLevel) {
             state.flowersAtMaxLevel++;
-            
+                
             // Проверка, набрано ли достаточное количество цветов максимального уровня
             if (state.flowersAtMaxLevel >= state.targetFlowersForNextGameLevel) {
                 startLevelTransition();

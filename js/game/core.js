@@ -7,7 +7,7 @@ import { ParticleSystem } from '../particle.js';
 import { visualEffects } from '../visual-effects.js';
 import { initPhysics, destroyPhysics } from '../physics.js';
 import { resizeCanvas } from '../input.js';
-import { ScreenShake, AmbientMote } from '../effects.js';
+import { ScreenShake } from '../effects.js';  // Removed AmbientMote as it's not related to merging
 import { flowerPool } from '../flower-pool.js';
 
 const { GW, GH, VASE, DANGER_Y, DROP_Y, MAX_LEVEL, GAME_OVER_GRACE, MAX_FLOWER_TYPES, MAX_TYPES_AT_FULL, ADAPTIVE_FILL_THRESHOLD } = CONFIG;
@@ -62,9 +62,9 @@ export async function initGame(canvasEl, ctxEl, restartBtnEl, MatterLib) {
     // Initialize particles with performance configuration
     state.initParticles();
 
-    // Use performance-configured number of ambient motes
-    const ambientMoteCount = window.PERFORMANCE_CONFIG?.ambientMotes || 15;
-    for (let i = 0; i < ambientMoteCount; i++) state.ambientMotes.push(new AmbientMote());
+    // Removed ambient motes initialization as they are not merge-related effects
+    // const ambientMoteCount = window.PERFORMANCE_CONFIG?.ambientMotes || 15;
+    // for (let i = 0; i < ambientMoteCount; i++) state.ambientMotes.push(new AmbientMote());
 
     // Initialize unique palettes before generating flowers
     if (typeof window.initializeUniquePalettes === 'function') {
@@ -124,18 +124,17 @@ export function restart() {
     state.outOfBoundsCount = 0;
     state.highestLevel = 0; // Reset to 0 initially
     
-    // Clean up ambient motes
-    state.ambientMotes.forEach(mote => {
-        if (mote.cleanup) {
-            mote.cleanup();
-        }
-    });
-    state.ambientMotes = [];
+    // Removed ambient motes cleanup as they are not merge-related effects
+    // state.ambientMotes.forEach(mote => {
+    //     if (mote.cleanup) {
+    //         mote.cleanup();
+    //     }
+    // });
+    // Removed clearing ambientMotes array since the property no longer exists in state
 
-    // Initialize new ambient motes
-    // Initialize new ambient motes with performance-configured count
-    const ambientMoteCount = window.PERFORMANCE_CONFIG?.ambientMotes || 15;
-    for (let i = 0; i < ambientMoteCount; i++) state.ambientMotes.push(new AmbientMote());
+    // Removed ambient motes initialization as they are not merge-related effects
+    // const ambientMoteCount = window.PERFORMANCE_CONFIG?.ambientMotes || 15;
+    // for (let i = 0; i < ambientMoteCount; i++) state.ambientMotes.push(new AmbientMote());
     
     // Destroy and recreate physics world to prevent memory leaks
     destroyPhysics();

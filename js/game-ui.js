@@ -402,8 +402,8 @@ export function drawFlower(ctx, flower, t) {
     ctx.scale(scaleX * spawnSc, scaleY * spawnSc);
 
     if (glowAlpha > .01) {
-        // Apply bloom effect based on performance
-        visualEffects.addBloom(ctx, flower, pos, r, f.petalColor);
+        // Removed bloom effect - only merge effects are kept now
+        // visualEffects.addBloom(ctx, flower, pos, r, f.petalColor);
         
         ctx.save();
         ctx.shadowColor = rgba(f.petalColor, glowAlpha * .8);

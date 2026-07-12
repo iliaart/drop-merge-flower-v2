@@ -9,7 +9,6 @@ export class PerformanceOptimizer {
         
         this.perfConfig = window.PERFORMANCE_CONFIG || { 
             maxParticles: 500, 
-            ambientMotes: 15,
             mergeCheckFreq: 2,
             maxFlowersForMerges: 60
         };
@@ -40,7 +39,6 @@ export class PerformanceOptimizer {
         // Apply more aggressive limits for mobile devices
         if (this.isMobile) {
             this.perfConfig.maxParticles = Math.min(this.perfConfig.maxParticles, 300);
-            this.perfConfig.ambientMotes = Math.min(this.perfConfig.ambientMotes, 8);
             this.perfConfig.mergeCheckFreq = Math.max(this.perfConfig.mergeCheckFreq || 2, 3);
             this.perfConfig.maxFlowersForMerges = Math.min(this.perfConfig.maxFlowersForMerges || 60, 40);
         }
@@ -176,13 +174,12 @@ export class PerformanceOptimizer {
     // Set quality level and adjust corresponding parameters
     setQualityLevel(level) {
         this.qualityLevel = level;
-        const baseConfig = window.PERFORMANCE_CONFIG || { maxParticles: 500, ambientMotes: 15, mergeCheckFreq: 2, maxFlowersForMerges: 60 };
+        const baseConfig = window.PERFORMANCE_CONFIG || { maxParticles: 500, mergeCheckFreq: 2, maxFlowersForMerges: 60 }; // Removed ambientMotes as they are not merge-related effects
         
         switch(level) {
             case 'high':
                 window.PERFORMANCE_CONFIG = { ...baseConfig, 
                     maxParticles: baseConfig.maxParticles || 500, 
-                    ambientMotes: baseConfig.ambientMotes || 15, 
                     mergeCheckFreq: baseConfig.mergeCheckFreq || 2,
                     maxFlowersForMerges: baseConfig.maxFlowersForMerges || 60
                 };
@@ -190,7 +187,6 @@ export class PerformanceOptimizer {
             case 'medium':
                 window.PERFORMANCE_CONFIG = { ...baseConfig, 
                     maxParticles: Math.floor((baseConfig.maxParticles || 500) * 0.6), 
-                    ambientMotes: Math.floor((baseConfig.ambientMotes || 15) * 0.6), 
                     mergeCheckFreq: (baseConfig.mergeCheckFreq || 2) + 1,
                     maxFlowersForMerges: Math.floor((baseConfig.maxFlowersForMerges || 60) * 0.6)
                 };
@@ -198,7 +194,6 @@ export class PerformanceOptimizer {
             case 'low':
                 window.PERFORMANCE_CONFIG = { ...baseConfig, 
                     maxParticles: Math.floor((baseConfig.maxParticles || 500) * 0.3), 
-                    ambientMotes: Math.max(1, Math.floor((baseConfig.ambientMotes || 15) * 0.2)), 
                     mergeCheckFreq: (baseConfig.mergeCheckFreq || 2) + 2,
                     maxFlowersForMerges: Math.floor((baseConfig.maxFlowersForMerges || 60) * 0.3)
                 };

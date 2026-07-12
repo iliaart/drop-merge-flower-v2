@@ -124,95 +124,10 @@ export class MergeRingEffect extends BaseEffect {
     }
 }
 
-// Bloom/Glow effect class for flowers
-export class BloomEffect {
-    constructor() {
-        this.enabled = true;
-        this.intensity = 1.0;
-        this.blur = 10;
-        // Cache bloom canvas to avoid recreating gradients each frame
-        this.bloomCache = new Map();
-        this.cacheMaxSize = 5; // Limit cache size to prevent memory issues
-    }
-    
-    // Apply bloom effect to a flower
-    apply(ctx, flower, position, radius, petalColor) {
-        // Skip bloom on low-performance devices - removed since we removed FPS limitations
-        const perfConfig = window.PERFORMANCE_CONFIG || {};
-        if (!this.enabled) return; // Only check if effects are disabled
-        
-        // Use simplified bloom effect on mobile devices
-        if (perfConfig.isMobile) {
-            this.applySimpleBloom(ctx, position, radius, petalColor);
-            return;
-        }
-        
-        // Create a bloom/glow effect around the flower
-        const bloomRadius = radius * (1.2 + 0.3 * Math.sin(Date.now() * 0.005));
-        const cacheKey = `${Math.round(bloomRadius)}_${petalColor}`;
-        
-        let cachedCanvas = this.bloomCache.get(cacheKey);
-        if (!cachedCanvas) {
-            // Create new cached canvas
-            cachedCanvas = document.createElement('canvas');
-            const cachedCtx = cachedCanvas.getContext('2d');
-            cachedCanvas.width = bloomRadius * 4;
-            cachedCanvas.height = bloomRadius * 4;
-            
-            const gradient = cachedCtx.createRadialGradient(
-                bloomRadius * 2, bloomRadius * 2, radius * 0.5,
-                bloomRadius * 2, bloomRadius * 2, bloomRadius
-            );
-            
-            gradient.addColorStop(0, `${petalColor}00`); // Fully transparent at center
-            gradient.addColorStop(0.5, `${petalColor}40`); // Semi-transparent mid
-            gradient.addColorStop(1, `${petalColor}00`); // Fully transparent at edge
-            
-            cachedCtx.save();
-            cachedCtx.globalAlpha = 0.3 * this.intensity;
-            cachedCtx.shadowColor = petalColor;
-            cachedCtx.shadowBlur = this.blur * this.intensity;
-            cachedCtx.fillStyle = gradient;
-            cachedCtx.beginPath();
-            cachedCtx.arc(bloomRadius * 2, bloomRadius * 2, bloomRadius, 0, TAU);
-            cachedCtx.fill();
-            cachedCtx.restore();
-            
-            // Manage cache size
-            if (this.bloomCache.size >= this.cacheMaxSize) {
-                const firstKey = this.bloomCache.keys().next().value;
-                this.bloomCache.delete(firstKey);
-            }
-            this.bloomCache.set(cacheKey, cachedCanvas);
-        }
-        
-        ctx.save();
-        ctx.globalAlpha = 0.3 * this.intensity;
-        ctx.shadowColor = petalColor;
-        ctx.shadowBlur = this.blur * this.intensity;
-        ctx.drawImage(cachedCanvas, position.x - bloomRadius * 2, position.y - bloomRadius * 2);
-        ctx.restore();
-    }
-    
-    // Simplified bloom effect for mobile devices
-    applySimpleBloom(ctx, position, radius, petalColor) {
-        const bloomRadius = radius * 1.3;
-        ctx.save();
-        ctx.globalAlpha = 0.15;
-        ctx.fillStyle = petalColor;
-        ctx.beginPath();
-        ctx.arc(position.x, position.y, bloomRadius, 0, TAU);
-        ctx.fill();
-        ctx.restore();
-    }
-}
-
-
 // Visual effect manager that handles all effects
 export class VisualEffectManager {
     constructor() {
         this.effects = [];
-        this.bloomEffect = new BloomEffect();
         this.effectEnabled = true;
     }
     
@@ -263,11 +178,6 @@ export class VisualEffectManager {
         for (const effect of this.effects) {
             effect.draw(ctx);
         }
-    }
-    
-    // Create a bloom effect for a flower
-    addBloom(ctx, flower, position, radius, petalColor) {
-        this.bloomEffect.apply(ctx, flower, position, radius, petalColor);
     }
     
     // Create merge particles
@@ -485,37 +395,7 @@ export class VisualEffectManager {
     safeLightenColor(hexColor, amount) {
         return lightenColor(hexColor, amount);
     }
-    
-    // Create drop particles
-    createDropEffect(x, y, level) {
-        const allFlowers = getAllFlowersWithGenerated();
-        const f = allFlowers[level];
-        if (!f) return;
-        
-        // Reduce effect intensity on lower performance devices - removed since we removed FPS limitations
-        const perfConfig = window.PERFORMANCE_CONFIG || {};
-        const intensity = 1.0; // Full intensity since we removed FPS limitations
-        
-        this.addEffect('drop', x, y, {
-            count: Math.floor(4 * intensity),
-            color: f.petalColor,
-            life: 0.4
-        });
-    }
-    
-    // Create selection effect
-    createSelectionEffect(x, y, radius) {
-        // Reduce effect intensity on lower performance devices - removed since we removed FPS limitations
-        const perfConfig = window.PERFORMANCE_CONFIG || {};
-        // Removed performance-based check since we removed FPS limitations
-        
-        this.addEffect('selection', x, y, {
-            count: 8,
-            color: 'rgba(255, 255, 0, 0.7)',
-            life: 0.3
-        });
-    }
-    
+
     // Clear all effects
     clear() {
         this.effects = [];

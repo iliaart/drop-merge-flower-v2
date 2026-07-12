@@ -7,7 +7,7 @@ import { ParticleSystem, spawnMergeParticles, spawnDropParticles } from './parti
 import { visualEffects } from './visual-effects.js';
 import { initPhysics, applyForces, updateAngularVelocity, destroyPhysics } from './physics.js';
 import { resizeCanvas, setupInput as _setupInput } from './input.js';
-import { ScreenShake, AmbientMote } from './effects.js';
+import { ScreenShake } from './effects.js';  // Removed AmbientMote as it's not related to merging
 import { flowerPool } from './flower-pool.js'; // Import the flower pool
 import {
     drawBackground, drawVase, drawPreviewFlower, drawNextPreview,
@@ -139,12 +139,6 @@ function gameLoop(timestamp) {
     }
     
     state.shake.update(dt);
-    
-    // Update ambient motes with performance cap
-    const ambientMoteCount = perfConfig.ambientMotes || 15;
-    for (let i = 0; i < Math.min(state.ambientMotes.length, ambientMoteCount); i++) {
-        state.ambientMotes[i].update(dt, state.time);
-    }
     
     visualEffects.update(dt);
 

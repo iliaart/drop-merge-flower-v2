@@ -14,7 +14,6 @@ export const state = {
     // Game objects
     flowers: [],
     particles: null, // Will be initialized in game.js with performance config
-    ambientMotes: [],
     audio: new AudioSystem(),
     shake: null, // set after import
 

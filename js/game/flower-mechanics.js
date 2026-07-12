@@ -135,7 +135,6 @@ export function dropFlower() {
     const flower = createFlower(x, DROP_Y, state.currentLevel);
     if (flower) {
         flower.justSpawned = false;
-        visualEffects.createDropEffect(x, DROP_Y, state.currentLevel);
     }
     state.dropCooldown = .3; // Changed from .35 to .3 (0.3 seconds)
     // Clear any existing timeout

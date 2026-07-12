@@ -94,6 +94,13 @@ export function performMerge(fa, fb, idxA, idxB) {
     // Check if either of the flowers being merged is currently selected
     const wasSelected = state.selectedFlower && (state.selectedFlower === fa || state.selectedFlower === fb);
 
+    // Get the colors of the merging flowers to use for the effect BEFORE removing them
+    const allFlowers = getAllFlowersWithGenerated();
+    const flowerAData = allFlowers[fa.level];
+    const flowerBData = allFlowers[fb.level];
+    const colorA = flowerAData ? flowerAData.petalColor : '#FFAABB';
+    const colorB = flowerBData ? flowerBData.petalColor : '#FFAABB';
+
     // Remove the existing flowers
     removeFlower(idxA);
     removeFlower(idxB);
@@ -117,7 +124,8 @@ export function performMerge(fa, fb, idxA, idxB) {
             state.Matter.Body.setStatic(nf.body, true);  // Make kinematic during drag
         }
 
-        visualEffects.createMergeEffect(mx, my, newLevel);
+        // Create merge effect with colors of the merging flowers
+        visualEffects.createMergeEffect(mx, my, newLevel, colorA, colorB);
         state.shake.trigger(6 + newLevel * 2);
         state.audio.playMerge(newLevel);
         if (newLevel > state.highestLevel) state.highestLevel = newLevel;

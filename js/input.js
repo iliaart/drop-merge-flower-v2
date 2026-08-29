@@ -73,7 +73,7 @@ function getFlowerAtPosition(x, y) {
 let isMouseDown = false;
 let continuousDropInterval = null;
 
-function stopContinuousDrop() {
+export function stopContinuousDrop() {
     isMouseDown = false;
     window.isMouseDown = false; // For backward compatibility with other parts of code
     
@@ -83,6 +83,9 @@ function stopContinuousDrop() {
         continuousDropInterval = null;
     }
 }
+
+// Make it globally available for performance.js
+window.stopContinuousDrop = stopContinuousDrop;
 
 // Function to handle continuous dropping
 function startContinuousDrop() {

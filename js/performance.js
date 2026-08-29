@@ -261,12 +261,24 @@ export class PerformanceOptimizer {
     // Pause expensive operations when tab is not visible
     handleVisibilityChange() {
         if (document.hidden) {
-            // Reduce particle count when tab is hidden
+            // Completely stop all particle generation and continuous drops when tab is hidden
+            state.isPaused = true;
+            
+            // Set max particles to 0 to stop particle generation
             if (state.particles) {
-                state.particles.maxParticles = Math.floor(state.particles.maxParticles * 0.5);
+                state.particles.maxParticles = 0;
             }
+            
+            // Stop continuous drop
+            if (window.stopContinuousDrop) {
+                window.stopContinuousDrop();
+            }
+            
+            console.log('Performance: Paused all operations in background');
         } else {
             // Restore original particle count based on current quality level
+            state.isPaused = false;
+            
             if (state.particles && window.PERFORMANCE_CONFIG) {
                 const baseConfig = window.PERFORMANCE_CONFIG;
                 let particleMultiplier = 1;
@@ -285,6 +297,8 @@ export class PerformanceOptimizer {
                 
                 state.particles.maxParticles = Math.floor(baseConfig.maxParticles * particleMultiplier);
             }
+            
+            console.log('Performance: Resumed operations');
         }
     }
 }

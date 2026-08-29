@@ -6,7 +6,7 @@ import { generateRandomFlowerBatch, getAllFlowersWithGenerated, resetGeneratedFl
 import { ParticleSystem, spawnMergeParticles, spawnDropParticles } from './particle.js';
 import { visualEffects } from './visual-effects.js';
 import { initPhysics, applyForces, updateAngularVelocity, destroyPhysics } from './physics.js';
-import { resizeCanvas, setupInput as _setupInput } from './input.js';
+import { resizeCanvas, setupInput as _setupInput, stopContinuousDrop } from './input.js';
 import { ScreenShake } from './effects.js';  // Removed AmbientMote as it's not related to merging
 import { flowerPool } from './flower-pool.js'; // Import the flower pool
 import {
@@ -67,6 +67,12 @@ window.createFlower = createFlower;
 
 // ─── Game Loop ───────────────────────────────────────────
 function gameLoop(timestamp) {
+    // Pause all game logic when tab is hidden to prevent CPU usage
+    if (state.isPaused) {
+        requestAnimationFrame(gameLoop);
+        return;
+    }
+    
     // Get performance configuration
     const perfConfig = getPerformanceConfig();
 

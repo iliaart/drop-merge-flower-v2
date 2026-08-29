@@ -35,6 +35,7 @@ export const state = {
     dropCooldown: 0,
     dropIntervalId: null,
     isContinuousDrop: false,
+    isPaused: false,  // Flag to pause game when tab is hidden
 
     // Levels
     currentLevel: 0,

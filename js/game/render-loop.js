@@ -217,13 +217,13 @@ export function renderFrame(MatterLib) {
             drawFlower(ctx, selectedFlowerToRender, state.time);
         }
 
-        // Visual effects disabled - they cause flickering and reduce FPS
-        // visualEffects.draw(ctx);
+        // Draw visual effects
+        visualEffects.draw(ctx);
         
-        // Particles disabled to improve performance and stop flickering
-        // if (state.particles) {
-        //     state.particles.draw(ctx);
-        // }
+        // Draw particle system with performance check
+        if (state.particles) {
+            state.particles.draw(ctx);
+        }
 
         uiModule.drawPreviewFlower(ctx, state.time);
         uiModule.drawNextPreview(ctx, state.time);

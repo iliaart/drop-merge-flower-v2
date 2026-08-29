@@ -3,7 +3,7 @@ import { state } from './state.js';
 import { CONFIG } from './config.js';
 import { clamp, rand, TAU, rgba, hexToRgb, hslToHex } from './utils.js';
 import { generateRandomFlowerBatch, getAllFlowersWithGenerated, resetGeneratedFlowers, generateRandomFlower } from './random-flowers.js';
-import { ParticleSystem } from './particle.js';
+import { ParticleSystem, spawnMergeParticles, spawnDropParticles } from './particle.js';
 import { visualEffects } from './visual-effects.js';
 import { initPhysics, applyForces, updateAngularVelocity, destroyPhysics } from './physics.js';
 import { resizeCanvas, setupInput as _setupInput } from './input.js';
@@ -131,14 +131,16 @@ function gameLoop(timestamp) {
         state.dropCooldown -= dt;
         if (state.dropCooldown <= 0) state.dropCooldown = 0;
     }
-    
-    // Particles disabled to improve performance and stop flickering
-    // state.particles.update(dt);
+
+    // Update particles with performance cap
+    const maxParticles = perfConfig.maxParticles || 500;
+    if (state.particles && state.particles.count < maxParticles) {
+        state.particles.update(dt);
+    }
     
     state.shake.update(dt);
     
-    // Visual effects disabled - they cause flickering and reduce FPS
-    // visualEffects.update(dt);
+    visualEffects.update(dt);
 
     if (state.gameState === 'playing') checkGameOver(dt);
     if (state.flowers.some(f => f === null)) cleanupFlowers();

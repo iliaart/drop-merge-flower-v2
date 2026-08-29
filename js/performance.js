@@ -203,10 +203,10 @@ export class PerformanceOptimizer {
         // Apply physics settings based on quality level
         this.applyPhysicsSettings();
         
-        // Update particle system with new max particles
-        if (state.particles) {
-            state.particles.maxParticles = window.PERFORMANCE_CONFIG.maxParticles;
-        }
+        // Apply particle system settings (disabled - particles are turned off)
+        // if (state.particles) {
+        //     state.particles.maxParticles = window.PERFORMANCE_CONFIG.maxParticles;
+        // }
     }
     
     // Apply physics engine settings based on quality level
@@ -260,32 +260,33 @@ export class PerformanceOptimizer {
 
     // Pause expensive operations when tab is not visible
     handleVisibilityChange() {
-        if (document.hidden) {
-            // Reduce particle count when tab is hidden
-            if (state.particles) {
-                state.particles.maxParticles = Math.floor(state.particles.maxParticles * 0.5);
-            }
-        } else {
-            // Restore original particle count based on current quality level
-            if (state.particles && window.PERFORMANCE_CONFIG) {
-                const baseConfig = window.PERFORMANCE_CONFIG;
-                let particleMultiplier = 1;
+        // Particles disabled - no need to adjust particle count
+        // if (document.hidden) {
+        //     // Reduce particle count when tab is hidden
+        //     if (state.particles) {
+        //         state.particles.maxParticles = Math.floor(state.particles.maxParticles * 0.5);
+        //     }
+        // } else {
+        //     // Restore original particle count based on current quality level
+        //     if (state.particles && window.PERFORMANCE_CONFIG) {
+        //         const baseConfig = window.PERFORMANCE_CONFIG;
+        //         let particleMultiplier = 1;
                 
-                switch(this.qualityLevel) {
-                    case 'high':
-                        particleMultiplier = 1;
-                        break;
-                    case 'medium':
-                        particleMultiplier = 0.6;
-                        break;
-                    case 'low':
-                        particleMultiplier = 0.3;
-                        break;
-                }
+        //         switch(this.qualityLevel) {
+        //             case 'high':
+        //                 particleMultiplier = 1;
+        //                 break;
+        //             case 'medium':
+        //                 particleMultiplier = 0.6;
+        //                 break;
+        //             case 'low':
+        //                 particleMultiplier = 0.3;
+        //                 break;
+        //         }
                 
-                state.particles.maxParticles = Math.floor(baseConfig.maxParticles * particleMultiplier);
-            }
-        }
+        //         state.particles.maxParticles = Math.floor(baseConfig.maxParticles * particleMultiplier);
+        //     }
+        // }
     }
 }
 
@@ -334,12 +335,12 @@ export class MemoryManager {
             state.flowers = state.flowers.filter(flower => flower !== null);
         }
         
-        // Ensure particles don't exceed max capacity
-        if (state.particles && state.particles.particles) {
-            while (state.particles.particles.length > state.particles.maxParticles) {
-                state.particles.particles.shift();
-            }
-        }
+        // Particles disabled - no need to clean up particle array
+        // if (state.particles && state.particles.particles) {
+        //     while (state.particles.particles.length > state.particles.maxParticles) {
+        //         state.particles.particles.shift();
+        //     }
+        // }
         
         // Trigger browser's garbage collection hint
         if (window.gc) {

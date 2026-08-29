@@ -1,6 +1,6 @@
 // Shared Game State Module
 // Central mutable state accessible by all game modules
-import { ParticleSystem } from './particle.js';
+// ParticleSystem import removed - particles are disabled for performance
 import { AudioSystem } from './audio.js';
 
 export const state = {
@@ -13,7 +13,7 @@ export const state = {
 
     // Game objects
     flowers: [],
-    particles: null, // Will be initialized in game.js with performance config
+    particles: null, // Disabled - particles cause flickering and reduce FPS
     audio: new AudioSystem(),
     shake: null, // set after import
 
@@ -72,9 +72,9 @@ export const state = {
         lastRenderTime: 0
     },
     
-    // Initialize particles in game.js with performance config
-    initParticles: function() {
-        const maxParticles = window.PERFORMANCE_CONFIG?.maxParticles || 500;
-        this.particles = new ParticleSystem(maxParticles);
-    }
+    // Particles disabled - no initialization needed
+    // initParticles: function() {
+    //     const maxParticles = window.PERFORMANCE_CONFIG?.maxParticles || 500;
+    //     this.particles = new ParticleSystem(maxParticles);
+    // }
 };

@@ -182,41 +182,31 @@ export class VisualEffectManager {
     
     // Create merge particles
     createMergeEffect(x, y, level, colorA, colorB) {
-        const allFlowers = getAllFlowersWithGenerated();
-        const f = allFlowers[level];
-        if (!f) return;
-        
-        // Use colors of the merging flowers for particles if provided
-        let particleColor = f.petalColor; // Default to new flower's color
-        
-        if (colorA && colorB) {
-            // Blend the two colors of merging flowers for particles
-            particleColor = this.blendColors(colorA, colorB);
-        }
+        // Disabled particle effects to improve performance and stop flickering
+        // const allFlowers = getAllFlowersWithGenerated();
+        // const f = allFlowers[level];
+        // if (!f) return;
         
         // Use the new flower's color for rings
-        const ringColor = f.petalColor || '#FFAABB';
+        // const ringColor = f.petalColor || '#FFAABB';
         
-        // Reduce effect intensity on lower performance devices - removed since we removed FPS limitations
-        const perfConfig = window.PERFORMANCE_CONFIG || {};
-        const intensity = 1.0; // Full intensity since we removed FPS limitations
-        
+        // Particle effects disabled - they cause flickering and reduce FPS
         // Create primary particles - more intense and longer lasting
-        this.addEffect('merge', x, y, {
-            count: Math.floor(12 * intensity), // Increased from 8
-            color: particleColor, // Use blended color of merging flowers for particles
-            life: 1.2 // Increased from 0.8 for more visibility
-        });
+        // this.addEffect('merge', x, y, {
+        //     count: Math.floor(12 * intensity), // Increased from 8
+        //     color: particleColor, // Use blended color of merging flowers for particles
+        //     life: 1.2 // Increased from 0.8 for more visibility
+        // });
         
         // Create secondary particles - also enhanced
-        this.addEffect('merge', x, y, {
-            count: Math.floor(8 * intensity), // Increased from 5
-            color: lightenColor(particleColor, 0.3), // Lighter version of the merging flowers' blended color
-            life: 0.8 // Increased from 0.5 for more visibility
-        });
+        // this.addEffect('merge', x, y, {
+        //     count: Math.floor(8 * intensity), // Increased from 5
+        //     color: lightenColor(particleColor, 0.3), // Lighter version of the merging flowers' blended color
+        //     life: 0.8 // Increased from 0.5 for more visibility
+        // });
 
-        // Create additional ring effect for merge - more prominent and closer to merge location
-        this.createMergeRingEffect(x, y, ringColor); // Pass the new flower's color to the ring
+        // Ring effect disabled - it causes flickering and reduces FPS
+        // this.createMergeRingEffect(x, y, ringColor); // Pass the new flower's color to the ring
     }
     
     // Helper method to blend two colors

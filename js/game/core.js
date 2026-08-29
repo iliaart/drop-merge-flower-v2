@@ -3,7 +3,7 @@ import { state } from '../state.js';
 import { CONFIG } from '../config.js';
 import { clamp, rand, TAU, rgba, hexToRgb, hslToHex } from '../utils.js';
 import { generateRandomFlowerBatch, getAllFlowersWithGenerated, resetGeneratedFlowers } from '../random-flowers.js';
-import { ParticleSystem } from '../particle.js';
+// ParticleSystem import removed - particles are disabled for performance
 import { visualEffects } from '../visual-effects.js';
 import { initPhysics, destroyPhysics } from '../physics.js';
 import { resizeCanvas } from '../input.js';

@@ -38,33 +38,6 @@ export function drawVase(ctx) {
     drawVaseBottom(ctx, l, r, b, w, wallW);       // bottom
     drawVaseRim(ctx, l, r, t, wallW, rimH);       // rim stroke
 
-    // Glass reflections - static positions for stable visual effect
-    const perfConfig = window.PERFORMANCE_CONFIG || {};
-    ctx.save();
-    ctx.globalAlpha = .06;
-    ctx.strokeStyle = '#fff';
-    ctx.lineWidth = 2;
-    
-    // Fixed reflection positions and angles - no random generation each frame
-    const reflections = [
-        { x: l + 15, y: t + 40, length: 12, angle: 0.3 },
-        { x: r - 20, y: t + 60, length: 10, angle: -0.2 },
-        { x: l + 25, y: b - 50, length: 14, angle: 0.5 }
-    ];
-    
-    for (let i = 0; i < reflections.length; i++) {
-        const ref = reflections[i];
-        const rx = ref.x;
-        const ry = ref.y;
-        const endX = rx + Math.cos(ref.angle) * ref.length;
-        const endY = ry + Math.sin(ref.angle) * ref.length;
-        
-        ctx.beginPath();
-        ctx.moveTo(rx, ry);
-        ctx.lineTo(endX, endY);
-        ctx.stroke();
-    }
-    ctx.restore();
     ctx.restore();
 
     // Danger line

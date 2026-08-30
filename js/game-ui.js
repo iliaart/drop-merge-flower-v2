@@ -38,35 +38,6 @@ export function drawVase(ctx) {
     drawVaseBottom(ctx, l, r, b, w, wallW);       // bottom
     drawVaseRim(ctx, l, r, t, wallW, rimH);       // rim stroke
 
-    // Glass reflections - now positioned randomly within the vase area
-    const perfConfig = window.PERFORMANCE_CONFIG || {};
-    ctx.save();
-    ctx.globalAlpha = .06;
-    ctx.strokeStyle = '#fff';
-    ctx.lineWidth = 2;
-    for (let i = 0; i < 3; i++) {
-        // Generate random positions within the vase boundaries
-        const minX = l + 10;  // Minimum distance from left edge
-        const maxX = r - 10;  // Minimum distance from right edge
-        const minY = t + 20;  // Minimum distance from top edge
-        const maxY = b - 20;  // Minimum distance from bottom edge
-        
-        const rx = minX + Math.random() * (maxX - minX);
-        const ry = minY + Math.random() * (maxY - minY);
-        
-        // Draw a reflection line starting from the random position
-        const length = 8 + Math.random() * 12; // Random length for the reflection
-        const angle = Math.random() * TAU; // Random angle for the reflection
-        
-        const endX = rx + Math.cos(angle) * length;
-        const endY = ry + Math.sin(angle) * length;
-        
-        ctx.beginPath();
-        ctx.moveTo(rx, ry);
-        ctx.lineTo(endX, endY);
-        ctx.stroke();
-    }
-    ctx.restore();
     ctx.restore();
 
     // Danger line

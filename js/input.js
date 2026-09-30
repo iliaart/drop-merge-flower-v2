@@ -71,27 +71,18 @@ function getFlowerAtPosition(x, y) {
 
 // Variable to track mouse/touch hold state instead of using global window variable
 let isMouseDown = false;
-let continuousDropInterval = null;
 // Coordinates where the pointer went down inside the vase — used to drop
 // the flower on release (mouseup / touchend) instead of on press.
+// There is NO automatic/continuous dropping: exactly one flower drops
+// per press-and-release gesture.
 let pendingDropX = null;
 let pendingDropY = null;
-// Becomes true once the initial drop has been performed on release,
-// enabling continuous dropping while the button is still held.
-let dropStarted = false;
 
 export function stopContinuousDrop() {
     isMouseDown = false;
     window.isMouseDown = false; // For backward compatibility with other parts of code
     pendingDropX = null;
     pendingDropY = null;
-    dropStarted = false;
-    
-    // Clear the interval for continuous dropping
-    if (continuousDropInterval) {
-        clearInterval(continuousDropInterval);
-        continuousDropInterval = null;
-    }
 }
 
 // Make it globally available for performance.js
@@ -112,29 +103,7 @@ function performPendingDrop() {
         state.canDrop && state.gameState === 'playing') {
         state.audio.ensure();
         dropFlower();
-        dropStarted = true;
     }
-}
-
-// Function to handle continuous dropping
-function startContinuousDrop() {
-    // Ensure we don't create multiple intervals
-    if (continuousDropInterval) {
-        clearInterval(continuousDropInterval);
-    }
-    
-    // Create an interval that drops a flower every 300ms (the cooldown period).
-    // The first flower falls only after the button/touch is released, so we
-    // wait until dropStarted is set by performPendingDrop().
-    continuousDropInterval = setInterval(() => {
-        if (isMouseDown && dropStarted && state.canDrop && state.gameState === 'playing') {
-            const allFlowers = getAllFlowersWithGenerated();
-            if (allFlowers.length > 0 && state.mouseX >= CONFIG.VASE.l && state.mouseX <= CONFIG.VASE.r) {
-                state.audio.ensure();
-                dropFlower();
-            }
-        }
-    }, 300); // Match the cooldown period
 }
 
 /** Set up all input event listeners */
@@ -247,7 +216,6 @@ export function setupInput() {
                     state.audio.ensure();
                     pendingDropX = p.x;
                     pendingDropY = p.y;
-                    startContinuousDrop();
                 }
             } else {
                 // Mouse down outside vase area, just deselect
@@ -374,7 +342,6 @@ export function setupInput() {
                     state.audio.ensure();
                     pendingDropX = p.x;
                     pendingDropY = p.y;
-                    startContinuousDrop();
                 }
             } else {
                 // Touch outside vase area, just deselect

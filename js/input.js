@@ -72,10 +72,20 @@ function getFlowerAtPosition(x, y) {
 // Variable to track mouse/touch hold state instead of using global window variable
 let isMouseDown = false;
 let continuousDropInterval = null;
+// Coordinates where the pointer went down inside the vase — used to drop
+// the flower on release (mouseup / touchend) instead of on press.
+let pendingDropX = null;
+let pendingDropY = null;
+// Becomes true once the initial drop has been performed on release,
+// enabling continuous dropping while the button is still held.
+let dropStarted = false;
 
 export function stopContinuousDrop() {
     isMouseDown = false;
     window.isMouseDown = false; // For backward compatibility with other parts of code
+    pendingDropX = null;
+    pendingDropY = null;
+    dropStarted = false;
     
     // Clear the interval for continuous dropping
     if (continuousDropInterval) {
@@ -87,6 +97,25 @@ export function stopContinuousDrop() {
 // Make it globally available for performance.js
 window.stopContinuousDrop = stopContinuousDrop;
 
+/** Drop a flower at the stored press position when the pointer is released */
+function performPendingDrop() {
+    if (pendingDropX === null || pendingDropY === null) return;
+
+    const x = pendingDropX;
+    const y = pendingDropY;
+    pendingDropX = null;
+    pendingDropY = null;
+
+    // Only drop if we're allowed to drop and the press was inside the vase
+    if (x >= CONFIG.VASE.l && x <= CONFIG.VASE.r &&
+        y >= CONFIG.VASE.t && y <= CONFIG.VASE.b &&
+        state.canDrop && state.gameState === 'playing') {
+        state.audio.ensure();
+        dropFlower();
+        dropStarted = true;
+    }
+}
+
 // Function to handle continuous dropping
 function startContinuousDrop() {
     // Ensure we don't create multiple intervals
@@ -94,9 +123,11 @@ function startContinuousDrop() {
         clearInterval(continuousDropInterval);
     }
     
-    // Create an interval that drops a flower every 300ms (the cooldown period)
+    // Create an interval that drops a flower every 300ms (the cooldown period).
+    // The first flower falls only after the button/touch is released, so we
+    // wait until dropStarted is set by performPendingDrop().
     continuousDropInterval = setInterval(() => {
-        if (isMouseDown && state.canDrop && state.gameState === 'playing') {
+        if (isMouseDown && dropStarted && state.canDrop && state.gameState === 'playing') {
             const allFlowers = getAllFlowersWithGenerated();
             if (allFlowers.length > 0 && state.mouseX >= CONFIG.VASE.l && state.mouseX <= CONFIG.VASE.r) {
                 state.audio.ensure();
@@ -175,32 +206,8 @@ export function setupInput() {
     });
 
     state.canvas.addEventListener('click', e => {
-        const p = screenToGame(e.clientX, e.clientY);
-        state.lastMouseX = p.x;
-        state.lastMouseY = p.y;
-        
-        // Check if clicking on an existing flower
-        const clickedFlower = getFlowerAtPosition(p.x, p.y);
-        
-        if (clickedFlower) {
-            // Select the flower if not already selected
-            if (state.selectedFlower !== clickedFlower) {
-                state.selectedFlower = clickedFlower;
-            }
-        } else {
-            // If clicking on empty space within vase, deselect and potentially drop a new flower
-            if (p.x >= CONFIG.VASE.l && p.x <= CONFIG.VASE.r && 
-                p.y >= CONFIG.VASE.t && p.y <= CONFIG.VASE.b) {
-                state.selectedFlower = null;
-                if (state.canDrop && state.gameState === 'playing') {
-                    state.audio.ensure();
-                    dropFlower();
-                }
-            } else {
-                // Clicked outside vase area, just deselect
-                state.selectedFlower = null;
-            }
-        }
+        // Flower dropping is handled on mouseup/touchend now,
+        // so we don't drop anything on click.
     });
 
     state.canvas.addEventListener('mousedown', e => {
@@ -230,15 +237,16 @@ export function setupInput() {
             flowerBody.gravityScale = 0;
             state.Matter.Body.setStatic(flowerBody, true);
         } else {
-            // If mouse is within vase area, start continuous dropping
+            // If mouse is within vase area, remember it so we can drop on release
             if (p.x >= CONFIG.VASE.l && p.x <= CONFIG.VASE.r && 
                 p.y >= CONFIG.VASE.t && p.y <= CONFIG.VASE.b) {
                 state.selectedFlower = null;
                         
-                // Only start continuous drop if we're allowed to drop
+                // Only arm the drop if we're allowed to drop
                 if (state.canDrop && state.gameState === 'playing') {
                     state.audio.ensure();
-                    dropFlower();
+                    pendingDropX = p.x;
+                    pendingDropY = p.y;
                     startContinuousDrop();
                 }
             } else {
@@ -249,6 +257,8 @@ export function setupInput() {
     });
 
     state.canvas.addEventListener('mouseup', e => {
+        // Drop the flower on release (button up), not on press
+        performPendingDrop();
         stopContinuousDrop(); // Stop continuous drop when mouse is released
         // Stop dragging when mouse is released
         if (state.isDragging && state.selectedFlower) {
@@ -353,15 +363,17 @@ export function setupInput() {
             flowerBody.gravityScale = 0;
             state.Matter.Body.setStatic(flowerBody, true);
         } else {
-            // If touching empty space within vase, deselect and start continuous drop
+            // If touching empty space within vase, deselect and remember the
+            // position so the flower drops when the touch is released
             if (p.x >= CONFIG.VASE.l && p.x <= CONFIG.VASE.r && 
                 p.y >= CONFIG.VASE.t && p.y <= CONFIG.VASE.b) {
                 state.selectedFlower = null;
                         
-                // Only start continuous drop if we're allowed to drop
+                // Only arm the drop if we're allowed to drop
                 if (state.canDrop && state.gameState === 'playing') {
                     state.audio.ensure();
-                    dropFlower();
+                    pendingDropX = p.x;
+                    pendingDropY = p.y;
                     startContinuousDrop();
                 }
             } else {
@@ -405,6 +417,8 @@ export function setupInput() {
 
     state.canvas.addEventListener('touchend', e => {
         e.preventDefault();
+        // Drop the flower on release (touch up), not on touch start
+        performPendingDrop();
         stopContinuousDrop(); // Stop continuous drop on touch end
         // Stop dragging when touch is released
         if (state.isDragging && state.selectedFlower) {

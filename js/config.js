@@ -13,6 +13,18 @@ export const CONFIG = {
     MAX_LEVEL: 57, // Increased to accommodate generated flowers (8 default + 50 generated)
     GAME_OVER_GRACE: 2.5,
     MERGE_RADIUS_BONUS: 12, // extra pixels for merge trigger beyond physical body
+
+    // Cinematic merge (slow motion + attraction + focus)
+    SLOWMO_SCALE: 0.28,       // time scale during cinematic merge
+    SLOWMO_DURATION: 0.6,     // real seconds of full slow-motion before lerp back
+    ATTRACT_FORCE: 0.045,     // attraction force between same-level flowers during slow-mo
+    ATTRACT_MAX_SPEED: 7,     // px/step velocity cap while being attracted
+    ATTRACT_MIN_DIST: 30,     // stop attracting when closer than this (px)
+    ATTRACT_RANGE: 240,       // max distance at which attraction applies
+    MERGE_SIZE_STEP: 0.06,    // each flower becomes ~6% bigger per merge generation
+    MAX_MERGE_SIZE_MULT: 1.6, // cap for the size multiplier
+    BONUS_WINDOW: 2.2,        // real-seconds window to keep the combo chain alive
+    BONUS_MAX_FILL: 10,       // number of coefficient steps that fills the bonus bar
     
     // Physics
     GRAVITY: 1.4,

@@ -6,7 +6,37 @@ import { clamp, ease, rgba, TAU } from './utils.js';
 import { getFlowerCache } from './flower-cache.js';
 import { drawStamens } from './stamens.js';
 import { visualEffects } from './visual-effects.js';
-import { getFocusValue, getSizeMult, getComboMultiplier, drawCinematicVignette } from './game/merge-cinema.js';
+// NOTE: merge-cinema.js statically imports game-ui.js (for createFlower), so
+// importing it back here would create a circular dependency that breaks module
+// evaluation and the game never starts. The cinematic getters are provided by
+// merge-cinema at runtime via attachCinemaHelpers(). Defaults keep drawing safe
+// before the game loop has run a single frame.
+let _getFocusValue = () => 1;
+let _getBlurPx = () => 0;
+let _getSizeMult = () => 1;
+let _getComboMultiplier = () => 1 + Math.max(0, state.comboCount || 0);
+
+export function attachCinemaHelpers(h) {
+    if (!h) return;
+    if (typeof h.getFocusValue === 'function') _getFocusValue = h.getFocusValue;
+    if (typeof h.getBlurPx === 'function') _getBlurPx = h.getBlurPx;
+    if (typeof h.getSizeMult === 'function') _getSizeMult = h.getSizeMult;
+    if (typeof h.getComboMultiplier === 'function') _getComboMultiplier = h.getComboMultiplier;
+}
+
+const getFocusValue = (f) => _getFocusValue(f);
+const getBlurPx = (v) => _getBlurPx(v);
+const getSizeMult = (f) => _getSizeMult(f);
+const getComboMultiplier = () => _getComboMultiplier();
+
+/** Cinematic vignette — called exactly ONCE per frame from the render loop. */
+export function drawCinematicVignetteOnce(ctx) {
+    // Vignette must be drawn at most once per frame even if the render loop
+    // forgot to reset the flag (defensive against stacked-alpha dark circles).
+    if (state.vignetteDrawnThisFrame) return;
+    state.vignetteDrawnThisFrame = true;
+    _drawCinematicVignette(ctx);
+}
 
 const { GW, GH, VASE, DANGER_Y, DROP_Y, GAME_OVER_GRACE } = CONFIG;
 
@@ -446,9 +476,13 @@ export function drawFlower(ctx, flower, t) {
         spawnSc = ease.outElastic(sp);
     }
 
-    // Cinematic focus: during slow-mo only the merging flower stays sharp, rest is blurred
+    // Cinematic focus: during slow-mo only the merging flower stays sharp, rest is softly blurred.
+    // getBlurPx clamps the radius so a blurred flower never turns into a dark circle/halo.
+    // FPS: focus/size are animated once per frame in updateCinema(); here we only READ them.
+    // getBlurPx returns 0 unless a cinematic is active AND few flowers are on screen,
+    // because ctx.filter="blur()" is by far the most expensive canvas operation.
     const focus = getFocusValue(flower);
-    const blurPx = Math.round((1 - focus) * 6);
+    const blurPx = getBlurPx(focus);
 
     // Merged flowers stay slightly bigger (lerped size multiplier)
     const sizeMult = getSizeMult(flower);
@@ -501,8 +535,9 @@ export function drawFlower(ctx, flower, t) {
     ctx.fillText(`${f.generationNumber || '?'}`, 0, 0);
     ctx.restore();
 
-    // Cinematic vignette when time slows down during merges
-    drawCinematicVignette(ctx);
+    // Cinematic vignette is drawn once per frame from render-loop
+    // (drawCinematicVignetteOnce) — never per flower, so stacked alphas can
+    // not produce a dark circle.
 
     // Note: Selection indicator is now drawn in the main game loop to ensure proper layering
 }

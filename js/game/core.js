@@ -187,13 +187,24 @@ export function getVaseFillRatio() {
 /**
  * Get the set of distinct flower levels currently in the vase (sorted ascending).
  */
+// FPS OPTIMIZATION: distinct-levels result cached for ~100ms.
+// It is consumed by autoMergeExcessTypes / pickLevel every frame; rebuilding a
+// Set + sorting it 60 times per second was pure waste. The cache only ever
+// under-reports freshness by 100ms, which is harmless for merge checks.
+let _distinctCache = null;
+let _distinctCacheTime = 0;
+
 export function getDistinctLevelsInVase() {
+    const now = performance.now();
+    if (_distinctCache && now - _distinctCacheTime < 100) return _distinctCache;
     const levels = new Set();
     for (const f of state.flowers) {
         if (!f) continue;
         levels.add(f.level);
     }
-    return [...levels].sort((a, b) => a - b);
+    _distinctCache = [...levels].sort((a, b) => a - b);
+    _distinctCacheTime = now;
+    return _distinctCache;
 }
 
 /**

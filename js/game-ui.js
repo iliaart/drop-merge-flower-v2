@@ -15,6 +15,10 @@ let _getFocusValue = () => 1;
 let _getBlurPx = () => 0;
 let _getSizeMult = () => 1;
 let _getComboMultiplier = () => 1 + Math.max(0, state.comboCount || 0);
+// Cinematic vignette is implemented in merge-cinema.js and handed over at
+// runtime via attachCinemaHelpers (game-ui must not import it statically to
+// avoid an ES-module cycle). Default: draw nothing until the hook arrives.
+let _drawCinematicVignette = () => {};
 
 export function attachCinemaHelpers(h) {
     if (!h) return;
@@ -22,6 +26,7 @@ export function attachCinemaHelpers(h) {
     if (typeof h.getBlurPx === 'function') _getBlurPx = h.getBlurPx;
     if (typeof h.getSizeMult === 'function') _getSizeMult = h.getSizeMult;
     if (typeof h.getComboMultiplier === 'function') _getComboMultiplier = h.getComboMultiplier;
+    if (typeof h.drawCinematicVignette === 'function') _drawCinematicVignette = h.drawCinematicVignette;
 }
 
 const getFocusValue = (f) => _getFocusValue(f);

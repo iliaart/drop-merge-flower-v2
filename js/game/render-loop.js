@@ -2,9 +2,16 @@
 import { state } from '../state.js';
 import { CONFIG } from '../config.js';
 import { getAllFlowersWithGenerated } from '../random-flowers.js';
-import { drawFlower } from '../game-ui.js';
 import { visualEffects } from '../visual-effects.js';
 import { clamp, TAU, rgba, hexToRgb, hslToHex } from '../utils.js';
+// IMPORTANT: game-ui.js must NOT be imported statically here. A static edge
+// into the game-module graph (game-ui → merge-cinema → …) risks closing an
+// ES-module cycle, which breaks evaluation silently — the boot script dies and
+// no flowers ever spawn. Load it exactly ONCE, lazily (cached by the browser).
+let _ui = null; // { drawBackground, drawVase, drawFlower, ... }
+const _uiReady = import('../game-ui.js')
+    .then(m => { _ui = m; })
+    .catch(err => console.error('render-loop: failed to load game-ui', err));
 
 const { VASE, DROP_Y } = CONFIG;
 
@@ -164,14 +171,17 @@ export function drawFlowerTail(ctx, flower, flowerData) {
     ctx.restore();
 }
 
-// FPS OPTIMIZATION: game-ui used to be pulled in via a dynamic import() INSIDE
+// FPS FIX: game-ui used to be pulled in via a dynamic import() INSIDE
 // renderFrame on every single frame. That scheduled a promise microtask chain
 // per frame and deferred all drawing asynchronously — combined with the rest of
-// the cinematic effects it tanked FPS toward 0. Static imports remove that cost
-// entirely (game-ui does not import this module, so there is no cycle).
-import * as uiModule from '../game-ui.js';
+// the cinematic effects it tanked FPS toward 0. The module is now loaded ONCE
+// at load time (see _uiReady at the top of this file); renderFrame only runs
+// after boot completes, so _ui is guaranteed to be ready.
 
 export function renderFrame(MatterLib) {
+    const ui = _ui;
+    if (!ui) return; // safety: UI module still loading (should never happen post-boot)
+
     // Render
     const ctx = state.ctx;
     // Vignette must be drawn at most once per frame (see drawFlower)
@@ -179,8 +189,8 @@ export function renderFrame(MatterLib) {
     ctx.save();
     ctx.translate(state.shake.x, state.shake.y);
 
-    uiModule.drawBackground(ctx);
-    uiModule.drawVase(ctx);
+    ui.drawBackground(ctx);
+    ui.drawVase(ctx);
 
     // Draw tails ONLY for the dragged / just-dropped flower.
     // Rendering a full multi-stroke tail for every moving body was O(bodies ×
@@ -201,16 +211,16 @@ export function renderFrame(MatterLib) {
         if (state.selectedFlower === f) {
             selectedFlowerToRender = f;
         } else {
-            drawFlower(ctx, f, state.time);
+            ui.drawFlower(ctx, f, state.time);
         }
     }
     if (selectedFlowerToRender) {
-        drawFlower(ctx, selectedFlowerToRender, state.time);
+        ui.drawFlower(ctx, selectedFlowerToRender, state.time);
     }
 
     // Cinematic vignette drawn ONCE per frame right after the scene (before UI),
     // never per-flower — avoids stacked-alpha dark circles and saves fill rate.
-    uiModule.drawCinematicVignetteOnce(ctx);
+    ui.drawCinematicVignetteOnce(ctx);
 
     // Draw visual effects
     visualEffects.draw(ctx);
@@ -220,17 +230,17 @@ export function renderFrame(MatterLib) {
         state.particles.draw(ctx);
     }
 
-    uiModule.drawPreviewFlower(ctx, state.time);
-    uiModule.drawNextPreview(ctx, state.time);
-    uiModule.drawHighestLevel(ctx);
-    uiModule.drawGameOverWarning(ctx);
-    uiModule.drawGameOver(ctx, state.time > 0 ? 0.016 : 0); // Используем state.time или фиксированное значение вместо dt
+    ui.drawPreviewFlower(ctx, state.time);
+    ui.drawNextPreview(ctx, state.time);
+    ui.drawHighestLevel(ctx);
+    ui.drawGameOverWarning(ctx);
+    ui.drawGameOver(ctx, state.time > 0 ? 0.016 : 0); // Используем state.time или фиксированное значение вместо dt
 
     // Добавляем отображение прогресса уровня
-    uiModule.drawLevelProgress(ctx);
+    ui.drawLevelProgress(ctx);
 
     // Добавляем отображение FPS
-    uiModule.drawFPS(ctx);
+    ui.drawFPS(ctx);
 
     ctx.restore();
 }

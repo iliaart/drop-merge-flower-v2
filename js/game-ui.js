@@ -6,7 +6,7 @@ import { clamp, ease, rgba, TAU } from './utils.js';
 import { getFlowerCache } from './flower-cache.js';
 import { drawStamens } from './stamens.js';
 import { visualEffects } from './visual-effects.js';
-import { getFocusValue, getSizeMult, getComboMultiplier, drawCinematicVignette } from './game/merge-cinema.js';
+import { getFocusValue, getBlurPx, getSizeMult, getComboMultiplier, drawCinematicVignette } from './game/merge-cinema.js';
 
 const { GW, GH, VASE, DANGER_Y, DROP_Y, GAME_OVER_GRACE } = CONFIG;
 
@@ -446,9 +446,10 @@ export function drawFlower(ctx, flower, t) {
         spawnSc = ease.outElastic(sp);
     }
 
-    // Cinematic focus: during slow-mo only the merging flower stays sharp, rest is blurred
+    // Cinematic focus: during slow-mo only the merging flower stays sharp, rest is softly blurred.
+    // getBlurPx clamps the radius so a blurred flower never turns into a dark circle/halo.
     const focus = getFocusValue(flower);
-    const blurPx = Math.round((1 - focus) * 6);
+    const blurPx = getBlurPx(focus);
 
     // Merged flowers stay slightly bigger (lerped size multiplier)
     const sizeMult = getSizeMult(flower);
@@ -501,8 +502,12 @@ export function drawFlower(ctx, flower, t) {
     ctx.fillText(`${f.generationNumber || '?'}`, 0, 0);
     ctx.restore();
 
-    // Cinematic vignette when time slows down during merges
-    drawCinematicVignette(ctx);
+    // Cinematic vignette when time slows down during merges — drawn ONCE per frame
+    // (not per flower) to avoid stacking alpha into a dark circle and to save FPS.
+    if (!state.vignetteDrawnThisFrame) {
+        state.vignetteDrawnThisFrame = true;
+        drawCinematicVignette(ctx);
+    }
 
     // Note: Selection indicator is now drawn in the main game loop to ensure proper layering
 }

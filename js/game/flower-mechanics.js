@@ -44,6 +44,12 @@ export function createFlower(x, y, level) {
     flower.spawnScale = 1;
     flower.spawnTimer = 0;
     flower.mergeGlow = 0;
+    // Cinematic merge fields — reset on pool reuse (no stale focus/size between lives)
+    flower.focus = 1;
+    flower.sizeMult = 1;
+    flower.mergeDepth = 0;
+    flower.attracting = false;
+    flower.mergeHoldUntil = 0;
     flower.landingVy = 0;
     flower.squashS = 0;
     flower.squashV = 0;

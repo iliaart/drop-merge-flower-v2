@@ -15,8 +15,8 @@ export const CONFIG = {
     MERGE_RADIUS_BONUS: 12, // extra pixels for merge trigger beyond physical body
 
     // Cinematic merge (slow motion + attraction + focus)
-    SLOWMO_SCALE: 0.28,       // time scale during cinematic merge
-    SLOWMO_DURATION: 0.6,     // real seconds of full slow-motion before lerp back
+    SLOWMO_SCALE: 0.56,       // time scale during cinematic merge (halved slowdown: was 0.28)
+    SLOWMO_DURATION: 0.3,     // real seconds of full slow-motion before lerp back (was 0.6)
     ATTRACT_FORCE: 0.045,     // attraction force between same-level flowers during slow-mo
     ATTRACT_MAX_SPEED: 7,     // px/step velocity cap while being attracted
     ATTRACT_MIN_DIST: 30,     // stop attracting when closer than this (px)

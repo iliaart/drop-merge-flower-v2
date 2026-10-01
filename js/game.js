@@ -100,7 +100,7 @@ function gameLoop(timestamp) {
     state.lastTime = timestamp;
 
     // Cinematic slow-motion: time scale lerps back to normal after each merge
-    updateCinema(dt);
+    updateCinema(dt, timestamp / 1000);
     const sdt = dt * state.timeScale; // slowed (scene) time
     state.time += sdt;
 

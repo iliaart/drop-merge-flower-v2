@@ -54,6 +54,7 @@ export const state = {
 
     // Cinematic merge (slow-mo)
     timeScale: 1,          // physics/effect time scale multiplier
+    realTime: 0,           // un-scaled real seconds since start (for merge-hold timers)
     slowmoTimer: 0,        // remaining real seconds of full slow-motion
     slowmoRamp: 0.25,      // lerp duration back to normal time
 
@@ -65,6 +66,7 @@ export const state = {
     comboCount: 0,         // consecutive chain merges (x1 has 0 extra)
     bonusFill: 0,          // animated 0..1 fill of the bonus bar
     bonusFlash: 0,         // flash intensity when coefficient increases
+    focusFlower: null,     // flower currently in cinematic focus (never a dark circle — only flowers are sharp/blurred)
 
     // Canvas
     canvas: null,

@@ -4,7 +4,7 @@ import { CONFIG } from '../config.js';
 import { getAllFlowersWithGenerated } from '../random-flowers.js';
 import { visualEffects } from '../visual-effects.js';
 import { removeFlower, createFlower } from './flower-mechanics.js';
-import { triggerSlowmo, awardMergeScore } from './merge-cinema.js';
+import { triggerSlowmo, awardMergeScore, setFocusTarget } from './merge-cinema.js';
 
 const { MERGE_RADIUS_BONUS } = CONFIG;
 
@@ -116,9 +116,12 @@ export function performMerge(fa, fb, idxA, idxB) {
     // Create the new flower
     const nf = createFlower(mx, my, newLevel);
     if (nf) {
-        nf.spawning = true;
+        nf.spawning = false;      // merged flower appears instantly — no spawn pop-in delay
         nf.mergeGlow = 1;
         nf.mergeDepth = newDepth;
+        // Fast focus transfer onto the newly merged flower; it stays fully physical
+        // (dynamic body, gravity on) during the merge hold (0.2s) and after the drop.
+        setFocusTarget(nf);
 
         // Floating "+points (xN)" text at the merge point
         visualEffects.createScorePopup(mx, my - 20, base * mult, mult);

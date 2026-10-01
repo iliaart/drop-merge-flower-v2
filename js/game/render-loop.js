@@ -167,6 +167,8 @@ export function drawFlowerTail(ctx, flower, flowerData) {
 export function renderFrame(MatterLib) {
     // Render
     const ctx = state.ctx;
+    // Vignette must be drawn at most once per frame (see drawFlower)
+    state.vignetteDrawnThisFrame = false;
     ctx.save();
     ctx.translate(state.shake.x, state.shake.y);
 

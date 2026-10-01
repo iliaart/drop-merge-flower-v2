@@ -6,6 +6,7 @@ import { clamp, ease, rgba, TAU } from './utils.js';
 import { getFlowerCache } from './flower-cache.js';
 import { drawStamens } from './stamens.js';
 import { visualEffects } from './visual-effects.js';
+import { getFocusValue, getSizeMult, getComboMultiplier, drawCinematicVignette } from './game/merge-cinema.js';
 
 const { GW, GH, VASE, DANGER_Y, DROP_Y, GAME_OVER_GRACE } = CONFIG;
 
@@ -299,6 +300,92 @@ export function drawLevelProgress(ctx) {
     ctx.restore();
 }
 
+/** Draw score counter and cinematic combo bonus bar */
+export function drawScoreUI(ctx) {
+    if (state.gameState !== 'playing') return;
+    const mult = getComboMultiplier();
+    const chainActive = state.time - state.lastMergeTime <= CONFIG.BONUS_WINDOW;
+
+    ctx.save();
+    // Score counter (top center)
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.font = 'bold 30px Georgia';
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = 'rgba(0,0,0,0.6)';
+    const scoreText = `${Math.round(state.score)}`;
+    ctx.strokeText(scoreText, GW / 2, 34);
+    ctx.fillStyle = '#ffffff';
+    ctx.fillText(scoreText, GW / 2, 34);
+
+    // Active coefficient label under the score
+    if (chainActive && mult > 1) {
+        const pulse = 1 + 0.08 * Math.sin(state.time * 10);
+        ctx.font = `bold ${Math.round(16 * pulse)}px Georgia`;
+        ctx.strokeText(`x${mult}`, GW / 2, 58);
+        ctx.fillStyle = mult >= 4 ? '#ffd24d' : '#ffe9a8';
+        ctx.fillText(`x${mult}`, GW / 2, 58);
+    }
+    ctx.restore();
+
+    // Bonus bar: fills with accumulated x-coefficients of consecutive merges
+    const barW = 220, barH = 10, barX = GW / 2 - barW / 2, barY = 72;
+    ctx.save();
+    ctx.fillStyle = 'rgba(0,0,0,0.35)';
+    roundRect(ctx, barX - 2, barY - 2, barW + 4, barH + 4, 7);
+    ctx.fill();
+
+    const grad = ctx.createLinearGradient(barX, 0, barX + barW, 0);
+    grad.addColorStop(0, '#ffb347');
+    grad.addColorStop(0.6, '#ff6ec7');
+    grad.addColorStop(1, '#ffd24d');
+    ctx.fillStyle = grad;
+    roundRect(ctx, barX, barY, Math.max(0, barW * state.bonusFill), barH, 5);
+    ctx.fill();
+
+    // Segment ticks per coefficient step
+    ctx.strokeStyle = 'rgba(0,0,0,0.35)';
+    ctx.lineWidth = 1;
+    for (let i = 1; i < CONFIG.BONUS_MAX_FILL; i++) {
+        const tx = barX + (barW * i) / CONFIG.BONUS_MAX_FILL;
+        ctx.beginPath();
+        ctx.moveTo(tx, barY);
+        ctx.lineTo(tx, barY + barH);
+        ctx.stroke();
+    }
+
+    // Flash on coefficient increase
+    if (state.bonusFlash > 0.01) {
+        ctx.globalAlpha = state.bonusFlash * 0.5;
+        ctx.fillStyle = '#ffffff';
+        roundRect(ctx, barX, barY, barW, barH, 5);
+        ctx.fill();
+        ctx.globalAlpha = 1;
+    }
+
+    ctx.font = 'bold 11px Georgia';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = 'rgba(255,255,255,0.8)';
+    ctx.fillText('БОНУС', barX, barY + barH + 12);
+    ctx.textAlign = 'right';
+    ctx.fillStyle = chainActive && mult > 1 ? '#ffd24d' : 'rgba(255,255,255,0.6)';
+    ctx.fillText(`x${mult}`, barX + barW, barY + barH + 12);
+    ctx.restore();
+}
+
+function roundRect(ctx, x, y, w, h, r) {
+    if (w <= 0) { ctx.beginPath(); return; }
+    const rr = Math.min(r, w / 2, h / 2);
+    ctx.beginPath();
+    ctx.moveTo(x + rr, y);
+    ctx.arcTo(x + w, y, x + w, y + h, rr);
+    ctx.arcTo(x + w, y + h, x, y + h, rr);
+    ctx.arcTo(x, y + h, x, y, rr);
+    ctx.arcTo(x, y, x + w, y, rr);
+    ctx.closePath();
+}
+
 /** Draw FPS counter in top-right corner */
 export function drawFPS(ctx) {
     // Draw FPS counter in top-right corner of screen
@@ -359,6 +446,13 @@ export function drawFlower(ctx, flower, t) {
         spawnSc = ease.outElastic(sp);
     }
 
+    // Cinematic focus: during slow-mo only the merging flower stays sharp, rest is blurred
+    const focus = getFocusValue(flower);
+    const blurPx = Math.round((1 - focus) * 6);
+
+    // Merged flowers stay slightly bigger (lerped size multiplier)
+    const sizeMult = getSizeMult(flower);
+
     let glowAlpha = 0;
     if (flower.mergeGlow > 0) {
         glowAlpha = flower.mergeGlow;
@@ -370,7 +464,8 @@ export function drawFlower(ctx, flower, t) {
     ctx.save();
     ctx.translate(pos.x, pos.y);
     ctx.rotate(angle + sway);
-    ctx.scale(scaleX * spawnSc, scaleY * spawnSc);
+    ctx.scale(scaleX * spawnSc * sizeMult, scaleY * spawnSc * sizeMult);
+    if (blurPx > 0) ctx.filter = `blur(${blurPx}px)`;
 
     if (glowAlpha > .01) {
         // Removed bloom effect - only merge effects are kept now
@@ -392,6 +487,7 @@ export function drawFlower(ctx, flower, t) {
     
     // Draw the generation number above the flower regardless of performance since we removed FPS limitations
     ctx.save();
+    ctx.globalAlpha = 0.25 + 0.75 * focus; // out-of-focus labels fade away
     ctx.translate(pos.x, pos.y - r - 15); // Position above the flower
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
@@ -404,7 +500,10 @@ export function drawFlower(ctx, flower, t) {
     ctx.strokeText(`${f.generationNumber || '?'}`, 0, 0);
     ctx.fillText(`${f.generationNumber || '?'}`, 0, 0);
     ctx.restore();
-    
+
+    // Cinematic vignette when time slows down during merges
+    drawCinematicVignette(ctx);
+
     // Note: Selection indicator is now drawn in the main game loop to ensure proper layering
 }
 

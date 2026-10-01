@@ -20,6 +20,7 @@ import { createFlower, removeFlower, cleanupFlowers, dropFlower } from './game/f
 import { autoMergeExcessTypes, forceOverlapMerges, performMerge } from './game/merge-system.js';
 import { checkMerges } from './game/spatial-grid.js';
 import { updateFlowers, updateSquash } from './game/update-loop.js';
+import { updateCinema, applyMergeAttraction } from './game/merge-cinema.js';
 import { renderFrame } from './game/render-loop.js';
 import { shouldSkipFrame } from './game/utils.js';
 
@@ -97,25 +98,32 @@ function gameLoop(timestamp) {
     const rawDt = (timestamp - state.lastTime) / 1000;
     const dt = Math.min(rawDt, 1 / 20);
     state.lastTime = timestamp;
-    state.time += dt;
+
+    // Cinematic slow-motion: time scale lerps back to normal after each merge
+    updateCinema(dt);
+    const sdt = dt * state.timeScale; // slowed (scene) time
+    state.time += sdt;
 
     // Update physics using the state's Matter reference
     if (state.Matter && state.Matter.Engine) {
-        state.Matter.Engine.update(state.engine, dt * 1000);
+        state.Matter.Engine.update(state.engine, sdt * 1000);
     } else {
         console.warn("state.Matter is not initialized, physics update skipped.");
     }
-    applyForces(dt);
+    applyForces(sdt);
+
+    // During slow-mo same-level flowers are cinematically attracted to each other
+    applyMergeAttraction();
 
     // Update flower states
     for (const f of state.flowers) {
         if (!f) continue;
         updateAngularVelocity(f);
         if (f.spawning) {
-            f.spawnTimer += dt;
+            f.spawnTimer += sdt;
             if (f.spawnTimer >= .5) f.spawning = false;
         }
-        updateSquash(f, dt);
+        updateSquash(f, sdt);
     }
 
     // Update flower tails for dragged or kinematic flowers
@@ -141,14 +149,14 @@ function gameLoop(timestamp) {
     // Update particles with performance cap
     const maxParticles = perfConfig.maxParticles || 500;
     if (state.particles && state.particles.count < maxParticles) {
-        state.particles.update(dt);
+        state.particles.update(sdt);
     }
     
-    state.shake.update(dt);
+    state.shake.update(sdt);
     
-    visualEffects.update(dt);
+    visualEffects.update(dt); // manager applies timeScale internally
 
-    if (state.gameState === 'playing') checkGameOver(dt);
+    if (state.gameState === 'playing') checkGameOver(sdt);
     if (state.flowers.some(f => f === null)) cleanupFlowers();
 
     // Render - only if enough time has passed since last render for performance

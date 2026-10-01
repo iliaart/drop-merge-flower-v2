@@ -1,5 +1,6 @@
 // Enhanced Visual Effects Module
-import { rand, TAU, rgba } from './utils.js';
+import { rand, TAU, rgba, clamp } from './utils.js';
+import { state } from './state.js';
 import { getAllFlowersWithGenerated } from './random-flowers.js';
 
 // Base Effect class for inheritance
@@ -129,6 +130,54 @@ export class VisualEffectManager {
     constructor() {
         this.effects = [];
         this.effectEnabled = true;
+        this.popups = []; // floating coefficient / score texts
+    }
+
+    /** Floating cinematic "x2 / x3 / x4..." coefficient popup shown on chain merges */
+    createCoefficientPopup(x, y, mult) {
+        if (this.popups.length >= 12) this.popups.shift();
+        this.popups.push({
+            x, y: y - 30, text: 'x' + mult, life: 1.6, maxLife: 1.6,
+            vy: -55, color: mult >= 4 ? '#ffd24d' : '#ffe9a8',
+            size: Math.min(24 + mult * 6, 54)
+        });
+    }
+
+    /** Floating "+points" score popup at the merge location */
+    createScorePopup(x, y, points) {
+        if (this.popups.length >= 12) this.popups.shift();
+        this.popups.push({
+            x, y, text: '+' + Math.round(points), life: 1.1, maxLife: 1.1,
+            vy: -40, color: '#ffffff', size: 18
+        });
+    }
+
+    updatePopups(sdt) {
+        for (let i = this.popups.length - 1; i >= 0; i--) {
+            const p = this.popups[i];
+            p.life -= sdt;
+            p.y += p.vy * sdt;
+            p.vy *= (1 - 1.5 * sdt);
+            if (p.life <= 0) this.popups.splice(i, 1);
+        }
+    }
+
+    drawPopups(ctx) {
+        for (const p of this.popups) {
+            const t = clamp(p.life / p.maxLife, 0, 1);
+            const appear = Math.min(1, (1 - t) * 6);
+            ctx.save();
+            ctx.globalAlpha = t * appear;
+            ctx.font = 'bold ' + p.size + 'px Georgia';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.lineWidth = 3;
+            ctx.strokeStyle = 'rgba(0,0,0,0.7)';
+            ctx.strokeText(p.text, p.x, p.y);
+            ctx.fillStyle = p.color;
+            ctx.fillText(p.text, p.x, p.y);
+            ctx.restore();
+        }
     }
     
     // Add a new effect
@@ -146,13 +195,17 @@ export class VisualEffectManager {
         // Skip updates on very low-performance devices - removed since we removed FPS limitations
         const perfConfig = window.PERFORMANCE_CONFIG || {};
         // Removed performance-based check since we removed FPS limitations
+
+        // Slow down effects together with cinematic time so they stay in sync with the scene
+        const sdt = dt * (state.timeScale || 1);
+        this.updatePopups(sdt);
         
         for (let i = this.effects.length - 1; i >= 0; i--) {
             const effect = this.effects[i];
             
-            // Call the effect's own update method
+            // Call the effect's own update method (with slowed time)
             if (typeof effect.update === 'function') {
-                if (!effect.update(dt)) {
+                if (!effect.update(sdt)) {
                     this.effects.splice(i, 1);
                 }
             } else {
@@ -178,6 +231,7 @@ export class VisualEffectManager {
         for (const effect of this.effects) {
             effect.draw(ctx);
         }
+        this.drawPopups(ctx);
     }
     
     // Create merge particles

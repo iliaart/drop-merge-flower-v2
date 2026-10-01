@@ -52,6 +52,20 @@ export const state = {
     // Merge tracking
     mergingSet: new Set(),
 
+    // Cinematic merge (slow-mo)
+    timeScale: 1,          // physics/effect time scale multiplier
+    slowmoTimer: 0,        // remaining real seconds of full slow-motion
+    slowmoRamp: 0.25,      // lerp duration back to normal time
+
+    // Score & combo multipliers
+    score: 0,              // points with combo coefficients applied
+    baseScore: 0,          // raw points without coefficients
+    lastMergeTime: -999,   // state.time of the previous merge
+    lastMergeLevel: -1,    // level produced by the previous merge
+    comboCount: 0,         // consecutive chain merges (x1 has 0 extra)
+    bonusFill: 0,          // animated 0..1 fill of the bonus bar
+    bonusFlash: 0,         // flash intensity when coefficient increases
+
     // Canvas
     canvas: null,
     ctx: null,

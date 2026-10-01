@@ -4,6 +4,7 @@ import { CONFIG } from '../config.js';
 import { getAllFlowersWithGenerated } from '../random-flowers.js';
 import { visualEffects } from '../visual-effects.js';
 import { removeFlower, createFlower } from './flower-mechanics.js';
+import { triggerSlowmo, awardMergeScore } from './merge-cinema.js';
 
 const { MERGE_RADIUS_BONUS } = CONFIG;
 
@@ -91,6 +92,13 @@ export function performMerge(fa, fb, idxA, idxB) {
     const my = (fa.body.position.y + fb.body.position.y) / 2;
     const newLevel = fa.level + 1;
 
+    // Cinematic slow-motion + combo coefficient chain (x2, x3, ...)
+    triggerSlowmo(mx, my, newLevel);
+    // Merge depth: child inherits the max depth of its parents + 1 (flowers get slightly bigger)
+    const newDepth = Math.max(fa.mergeDepth || 0, fb.mergeDepth || 0) + 1;
+    // Score with the active multiplier applied
+    const { base, mult } = awardMergeScore(newLevel);
+
     // Check if either of the flowers being merged is currently selected
     const wasSelected = state.selectedFlower && (state.selectedFlower === fa || state.selectedFlower === fb);
 
@@ -110,6 +118,10 @@ export function performMerge(fa, fb, idxA, idxB) {
     if (nf) {
         nf.spawning = true;
         nf.mergeGlow = 1;
+        nf.mergeDepth = newDepth;
+
+        // Floating "+points (xN)" text at the merge point
+        visualEffects.createScorePopup(mx, my - 20, base * mult, mult);
 
         // If one of the merged flowers was selected, select the new flower
         if (wasSelected) {

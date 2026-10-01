@@ -164,6 +164,13 @@ export function drawFlowerTail(ctx, flower, flowerData) {
     ctx.restore();
 }
 
+// FPS OPTIMIZATION: game-ui used to be pulled in via a dynamic import() INSIDE
+// renderFrame on every single frame. That scheduled a promise microtask chain
+// per frame and deferred all drawing asynchronously — combined with the rest of
+// the cinematic effects it tanked FPS toward 0. Static imports remove that cost
+// entirely (game-ui does not import this module, so there is no cycle).
+import * as uiModule from '../game-ui.js';
+
 export function renderFrame(MatterLib) {
     // Render
     const ctx = state.ctx;
@@ -172,75 +179,58 @@ export function renderFrame(MatterLib) {
     ctx.save();
     ctx.translate(state.shake.x, state.shake.y);
 
-    // Import drawing functions from game-ui module
-    import('../game-ui.js').then(uiModule => {
-        uiModule.drawBackground(ctx);
-        uiModule.drawVase(ctx);
+    uiModule.drawBackground(ctx);
+    uiModule.drawVase(ctx);
 
-        // Draw tails for all flowers that are being dragged or in kinematic motion
-        // This ensures tails appear underneath flowers according to the specification
-        for (const f of state.flowers) {
-            if (f) {
-                // Check if Matter and Body.getStatic exist before calling
-                const hasMatterBody = MatterLib && MatterLib.Body && typeof MatterLib.Body.getStatic === 'function';
-                const isKinematic = f.body && hasMatterBody && !MatterLib.Body.getStatic(f.body);
-                const isDragging = state.selectedFlower === f && state.isDragging;
-                
-                if (isDragging || isKinematic) {
-                    const allFlowers = getAllFlowersWithGenerated();
-                    const flowerData = allFlowers[f.level];
-                    drawFlowerTail(ctx, f, flowerData);
-                }
-            }
-        }
+    // Draw tails ONLY for the dragged / just-dropped flower.
+    // Rendering a full multi-stroke tail for every moving body was O(bodies ×
+    // 40 points × 6 strokes) per frame — a massive hidden cost. Static flowers
+    // keep empty tails anyway, so one targeted pass is visually identical.
+    const dragF = state.selectedFlower;
+    if (dragF && state.isDragging && dragF.tailPositions && dragF.tailPositions.length > 1) {
+        const allFlowers = getAllFlowersWithGenerated();
+        drawFlowerTail(ctx, dragF, allFlowers[dragF.level]);
+    }
 
-        // Separate the flowers into selected and unselected for rendering order
-        const unselectedFlowers = [];
-        let selectedFlowerToRender = null;
-
-        // Optimize flower iteration - only process flowers that exist
-        for (const f of state.flowers) {
-            if (f) {
-                if (state.selectedFlower === f) {
-                    selectedFlowerToRender = f;
-                } else {
-                    unselectedFlowers.push(f);
-                }
-            }
-        }
-
-        // Draw unselected flowers first
-        for (const f of unselectedFlowers) {
+    // Draw unselected flowers first, then the selected one on top.
+    // Single loop, zero per-frame array allocations.
+    let selectedFlowerToRender = null;
+    for (let i = 0; i < state.flowers.length; i++) {
+        const f = state.flowers[i];
+        if (!f) continue;
+        if (state.selectedFlower === f) {
+            selectedFlowerToRender = f;
+        } else {
             drawFlower(ctx, f, state.time);
         }
+    }
+    if (selectedFlowerToRender) {
+        drawFlower(ctx, selectedFlowerToRender, state.time);
+    }
 
-        // Then draw the selected flower on top
-        if (selectedFlowerToRender) {
-            drawFlower(ctx, selectedFlowerToRender, state.time);
-        }
+    // Cinematic vignette drawn ONCE per frame right after the scene (before UI),
+    // never per-flower — avoids stacked-alpha dark circles and saves fill rate.
+    uiModule.drawCinematicVignetteOnce(ctx);
 
-        // Draw visual effects
-        visualEffects.draw(ctx);
-        
-        // Draw particle system with performance check
-        if (state.particles) {
-            state.particles.draw(ctx);
-        }
+    // Draw visual effects
+    visualEffects.draw(ctx);
 
-        uiModule.drawPreviewFlower(ctx, state.time);
-        uiModule.drawNextPreview(ctx, state.time);
-        uiModule.drawHighestLevel(ctx);
-        uiModule.drawGameOverWarning(ctx);
-        uiModule.drawGameOver(ctx, state.time > 0 ? 0.016 : 0); // Используем state.time или фиксированное значение вместо dt
-        
-        // Добавляем отображение прогресса уровня
-        uiModule.drawLevelProgress(ctx);
-        
-        // Добавляем отображение FPS
-        uiModule.drawFPS(ctx);
-    }).catch(error => {
-        console.error('Error importing game-ui:', error);
-    });
+    // Draw particle system with performance check
+    if (state.particles) {
+        state.particles.draw(ctx);
+    }
+
+    uiModule.drawPreviewFlower(ctx, state.time);
+    uiModule.drawNextPreview(ctx, state.time);
+    uiModule.drawHighestLevel(ctx);
+    uiModule.drawGameOverWarning(ctx);
+    uiModule.drawGameOver(ctx, state.time > 0 ? 0.016 : 0); // Используем state.time или фиксированное значение вместо dt
+
+    // Добавляем отображение прогресса уровня
+    uiModule.drawLevelProgress(ctx);
+
+    // Добавляем отображение FPS
+    uiModule.drawFPS(ctx);
 
     ctx.restore();
 }

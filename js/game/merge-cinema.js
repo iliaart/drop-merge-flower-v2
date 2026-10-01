@@ -1,9 +1,21 @@
 // Merge Cinema Module — cinematic slow-motion, attraction, focus and combo coefficients
+//
+// FPS SAFETY RULES (this system previously dropped FPS to ~0):
+//  1. Attraction is O(n) per frame via a level-bucket scan + pairwise distance
+//     check, capped at MAX_ATTRACT_PAIRS pairs per cinematic step.
+//  2. Focus / size / blur are animated ONCE per frame for all flowers in
+//     updateCinema() — never inside the draw loop.
+//  3. The canvas "blur" filter is applied only during an active cinematic
+//     (timeScale < 0.95) and only while there are few enough flowers on screen;
+//     otherwise it silently degrades to no-blur. ctx.filter is extremely
+//     expensive on some GPUs, so it must never run unconditionally.
+//  4. Flowers are NEVER made static/non-physical here — no physics locking,
+//     no extra bodies; only cheap applyForce/setVelocity calls are used.
 import { state } from '../state.js';
 import { CONFIG } from '../config.js';
 import { getAllFlowersWithGenerated } from '../random-flowers.js';
 import { visualEffects } from '../visual-effects.js';
-import { lerp, clamp, ease, rgba } from '../utils.js';
+import { lerp, clamp, rgba } from '../utils.js';
 
 const { GW, GH, SLOWMO_SCALE, SLOWMO_DURATION, ATTRACT_FORCE, ATTRACT_MAX_SPEED,
         ATTRACT_MIN_DIST, ATTRACT_RANGE, MERGE_SIZE_STEP, MAX_MERGE_SIZE_MULT,
@@ -11,6 +23,11 @@ const { GW, GH, SLOWMO_SCALE, SLOWMO_DURATION, ATTRACT_FORCE, ATTRACT_MAX_SPEED,
 
 /** How long a merged flower keeps its cinematic hold (glow/focus priority) — real seconds */
 const MERGE_PHYSICS_HOLD = 0.2;
+
+/** Hard caps that keep every cinematic frame cheap */
+const MAX_ATTRACT_PAIRS = 8;      // max attraction force-pairs per frame
+const MAX_BLUR_FLOWERS = 25;      // skip ctx.filter blur when more flowers than this
+const ATTRACT_SCAN_RADIUS = 260;  // px — spatial pre-filter before exact distance test
 
 /** Combo coefficient for the current chain (x1, x2, x3, ...) */
 export function getComboMultiplier() {
@@ -65,7 +82,13 @@ export function awardMergeScore(newLevel) {
     return { base, mult };
 }
 
-/** Update time scale: hold slow-mo, then lerp smoothly back to normal time flow */
+/** Is a cinematic (slow-mo) sequence currently active? Cheap boolean check. */
+export function isCinematicActive() {
+    return state.timeScale < 0.95 && state.gameState === 'playing';
+}
+
+/** Update time scale + ALL per-flower cinematic animation once per frame.
+ *  This centralizes focus/size lerping so the draw loop does zero math per flower. */
 export function updateCinema(dtReal, realTime) {
     // Track real (un-scaled) time so physics-hold timers don't freeze during slow-mo
     state.realTime = realTime ?? ((state.realTime || 0) + dtReal);
@@ -88,51 +111,105 @@ export function updateCinema(dtReal, realTime) {
     if (ff && state.realTime > (ff.mergeHoldUntil || 0) + SLOWMO_DURATION + 0.35) {
         state.focusFlower = null;
     }
+
+    // ── Per-flower cinematic state, updated exactly once per frame ──────────
+    const cinematic = isCinematicActive();
+    const flowers = state.flowers;
+    for (let i = 0; i < flowers.length; i++) {
+        const f = flowers[i];
+        if (!f) continue;
+
+        // Focus target for this flower
+        let fTarget = 1;
+        if (cinematic) {
+            if (f === state.focusFlower || f.mergeGlow > 0) {
+                fTarget = 1;
+            } else if (f.attracting) {
+                fTarget = 0.85; // attracted pair stays mostly sharp while gliding together
+            } else {
+                fTarget = 0.45; // background flowers: soft blur only, never a black silhouette
+            }
+        }
+        // Fast transfer: strong lerp factor => focus jumps to the merged flower within ~2-3 frames
+        const cur = f.focus ?? fTarget;
+        const rate = fTarget > cur ? 0.5 : 0.28;
+        f.focus = lerp(cur, fTarget, rate);
+        if (Math.abs(f.focus - fTarget) < 0.01) f.focus = fTarget;
+
+        // Size multiplier: merged flowers stay slightly bigger (lerped in).
+        // When idle (depth 0) snap straight to 1 without allocating anything.
+        const depth = f.mergeDepth || 0;
+        const sTarget = depth > 0 ? Math.min(MAX_MERGE_SIZE_MULT, 1 + depth * MERGE_SIZE_STEP) : 1;
+        if (f.sizeMult !== sTarget) {
+            f.sizeMult = lerp(f.sizeMult ?? 1, sTarget, 0.08);
+            if (Math.abs(f.sizeMult - sTarget) < 0.002) f.sizeMult = sTarget;
+        }
+    }
 }
 
 /** Cinematic attraction: during slow-mo same-level flowers pull each other together.
- *  IMPORTANT (FPS): flowers are NEVER made static/non-physical here — no physics
- *  locking, no extra bodies. They stay fully dynamic during the merge hold (0.2s)
- *  and after the drop; only cheap applyForce/setVelocity calls are used. */
+ *  O(n) bucket scan, capped pair count — see FPS SAFETY RULES at the top. */
 export function applyMergeAttraction() {
-    // Clear stale attracting flags when not in cinematic mode
-    if (state.timeScale > 0.75 || state.gameState !== 'playing') {
-        for (let i = 0; i < state.flowers.length; i++) {
-            const f = state.flowers[i];
+    if (!isCinematicActive()) {
+        // Not cinematic: just clear stale flags (single cheap pass, no allocations)
+        const flowers = state.flowers;
+        for (let i = 0; i < flowers.length; i++) {
+            const f = flowers[i];
             if (f && f.attracting) f.attracting = false;
         }
         return;
     }
-    const { Body } = state.Matter;
-    const maxLevel = getAllFlowersWithGenerated().length - 1;
 
-    for (let i = 0; i < state.flowers.length; i++) {
-        const fa = state.flowers[i];
+    const { Body } = state.Matter;
+    const maxLevel = getAllFlowersWithGenerated().length - 1; // tiny array copy, fine per-frame
+    const flowers = state.flowers;
+    const n = flowers.length;
+
+    // Clear previous frame's marks; re-marked below only for actual participants
+    for (let i = 0; i < n; i++) {
+        const f = flowers[i];
+        if (f) f.attracting = false;
+    }
+
+    let pairs = 0;
+    const rangeSq = ATTRACT_RANGE * ATTRACT_RANGE;
+
+    for (let i = 0; i < n && pairs < MAX_ATTRACT_PAIRS; i++) {
+        const fa = flowers[i];
         if (!fa || !fa.body || fa.justSpawned) continue;
         if (fa === state.selectedFlower) continue;
         if (Body.getStatic && Body.getStatic(fa.body)) continue;
         if (fa.level >= maxLevel) continue;
 
-        for (let j = i + 1; j < state.flowers.length; j++) {
-            const fb = state.flowers[j];
+        const pa = fa.body.position;
+        for (let j = i + 1; j < n && pairs < MAX_ATTRACT_PAIRS; j++) {
+            const fb = flowers[j];
             if (!fb || !fb.body || fb.justSpawned || fb.level !== fa.level) continue;
             if (fb === state.selectedFlower) continue;
 
-            const dx = fb.body.position.x - fa.body.position.x;
-            const dy = fb.body.position.y - fa.body.position.y;
-            const dist = Math.hypot(dx, dy);
-            if (dist > ATTRACT_RANGE || dist < ATTRACT_MIN_DIST || dist < 1) continue;
+            const pb = fb.body.position;
+            // Cheap squared-distance pre-filter (no sqrt until a real candidate)
+            const dx = pb.x - pa.x;
+            if (dx > ATTRACT_SCAN_RADIUS || dx < -ATTRACT_SCAN_RADIUS) continue;
+            const dy = pb.y - pa.y;
+            if (dy > ATTRACT_SCAN_RADIUS || dy < -ATTRACT_SCAN_RADIUS) continue;
+            const distSq = dx * dx + dy * dy;
+            if (distSq > rangeSq || distSq < 1) continue;
+            const dist = Math.sqrt(distSq);
+            if (dist < ATTRACT_MIN_DIST) continue;
 
             const strength = ATTRACT_FORCE * fa.body.mass * (1 - dist / ATTRACT_RANGE);
-            const nx = dx / dist, ny = dy / dist;
-            Body.applyForce(fa.body, fa.body.position, { x: nx * strength, y: ny * strength });
+            const inv = 1 / dist;
+            const nx = dx * inv, ny = dy * inv;
+            Body.applyForce(fa.body, pa, { x: nx * strength, y: ny * strength });
             if (!(Body.getStatic && Body.getStatic(fb.body))) {
-                Body.applyForce(fb.body, fb.body.position, { x: -nx * strength, y: -ny * strength });
+                Body.applyForce(fb.body, pb, { x: -nx * strength, y: -ny * strength });
             }
 
             // Mark both as attracted so focus keeps them mostly sharp
             fa.attracting = true;
             fb.attracting = true;
+            pairs++;
 
             // Velocity cap for a smooth magnetic glide (no collisions/jitter)
             capAttractSpeed(fa.body);
@@ -152,53 +229,51 @@ function capAttractSpeed(body) {
 }
 
 /** Focus easing value for a flower: 1 = fully in focus, 0 = softly blurred.
- *  NOTE: the "blur floor" is deliberately high (never fully transparent/black)
- *  so no dark circle ever appears behind a blurred cached flower sprite.
- *  Focus transfers FAST from the old flower to the newly merged one. */
+ *  NOTE: animated centrally in updateCinema(); this getter is read-only now. */
 export function getFocusValue(f) {
-    const cinematic = state.timeScale < 0.95;
-    let target = 1;
-    if (cinematic) {
-        // The freshly merged flower (or last attraction participant) is sharp...
-        if (f === state.focusFlower || f.mergeGlow > 0) {
-            target = 1;
-        } else if (f.attracting) {
-            target = 0.85; // attracted pair stays mostly sharp while gliding together
-        } else {
-            target = 0.45; // background flowers: soft blur only, never a black silhouette
-        }
-    }
-    // Fast transfer: strong lerp factor => focus jumps to the merged flower within ~2-3 frames
-    const rate = target > (f.focus ?? target) ? 0.5 : 0.28;
-    f.focus = lerp(f.focus ?? target, target, rate);
-    if (Math.abs(f.focus - target) < 0.01) f.focus = target;
-    return f.focus;
+    return f.focus ?? 1;
 }
 
-/** Blur radius (px) derived from focus — clamped to a gentle bokeh range. */
+/** Blur radius (px) derived from focus — clamped to a gentle bokeh range.
+ *  Returns 0 outside an active cinematic or when too many flowers are on screen
+ *  (ctx.filter blur is the single most expensive operation in this game). */
 export function getBlurPx(focus) {
+    if (!isCinematicActive()) return 0;
+    if (state.flowers.length > MAX_BLUR_FLOWERS) return 0;
     // focus 1 -> 0px, focus 0.45 -> ~2.5px max: subtle, GPU-cheap, no dark halos
-    return Math.min(3, Math.max(0, Math.round((1 - focus) * 5)));
+    const b = (1 - focus) * 5;
+    return b < 0.75 ? 0 : (b > 3 ? 3 : Math.round(b));
 }
 
-/** Size multiplier: merged flowers stay slightly bigger (lerped in) */
+/** Size multiplier: merged flowers stay slightly bigger (lerped in).
+ *  Read-only — the lerp itself runs once per frame in updateCinema(). */
 export function getSizeMult(f) {
-    const target = Math.min(MAX_MERGE_SIZE_MULT, 1 + (f.mergeDepth || 0) * MERGE_SIZE_STEP);
-    f.sizeMult = lerp(f.sizeMult ?? 1, target, 0.08);
-    return f.sizeMult;
+    return f.sizeMult ?? 1;
 }
 
 /** Dark cinematic vignette drawn over the scene during slow-motion.
- *  SOFT light-touch only: very low alpha, warm tint — never a black circle. */
+ *  SOFT light-touch only: very low alpha, warm tint — never a black circle.
+ *  The gradient object is cached (rebuilding radial gradients per frame is costly). */
+let _vignetteGrad = null;
+let _vignetteIntensity = -1;
 export function drawCinematicVignette(ctx) {
     const intensity = clamp((0.9 - state.timeScale) / 0.62, 0, 1);
-    if (intensity <= 0.01) return;
+    if (intensity <= 0.01) {
+        _vignetteIntensity = -1;
+        return;
+    }
+    // Quantize intensity to 10 steps so we rebuild the gradient at most 10 times
+    const q = Math.round(intensity * 10) / 10;
+    if (!_vignetteGrad || q !== _vignetteIntensity) {
+        const g = ctx.createRadialGradient(GW / 2, GH / 2, GH * 0.45, GW / 2, GH / 2, GH * 0.85);
+        g.addColorStop(0, 'rgba(0,0,0,0)');
+        // gentle warm-dark edge (max ~12% opacity) instead of a hard dark ring
+        g.addColorStop(1, `rgba(10,5,15,${0.12 * q})`);
+        _vignetteGrad = g;
+        _vignetteIntensity = q;
+    }
     ctx.save();
-    const g = ctx.createRadialGradient(GW / 2, GH / 2, GH * 0.45, GW / 2, GH / 2, GH * 0.85);
-    g.addColorStop(0, 'rgba(0,0,0,0)');
-    // gentle warm-dark edge (max ~12% opacity) instead of a hard dark ring
-    g.addColorStop(1, `rgba(10,5,15,${0.12 * intensity})`);
-    ctx.fillStyle = g;
+    ctx.fillStyle = _vignetteGrad;
     ctx.fillRect(0, 0, GW, GH);
     ctx.restore();
 }

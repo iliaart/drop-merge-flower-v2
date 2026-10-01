@@ -448,6 +448,9 @@ export function drawFlower(ctx, flower, t) {
 
     // Cinematic focus: during slow-mo only the merging flower stays sharp, rest is softly blurred.
     // getBlurPx clamps the radius so a blurred flower never turns into a dark circle/halo.
+    // FPS: focus/size are animated once per frame in updateCinema(); here we only READ them.
+    // getBlurPx returns 0 unless a cinematic is active AND few flowers are on screen,
+    // because ctx.filter="blur()" is by far the most expensive canvas operation.
     const focus = getFocusValue(flower);
     const blurPx = getBlurPx(focus);
 

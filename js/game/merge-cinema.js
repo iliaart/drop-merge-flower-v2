@@ -16,14 +16,11 @@ import { CONFIG } from '../config.js';
 import { getAllFlowersWithGenerated } from '../random-flowers.js';
 import { visualEffects } from '../visual-effects.js';
 import { lerp, clamp, rgba } from '../utils.js';
-// NOTE: game-ui must never be imported by this module — it would risk closing
-// an ES-module cycle (game-ui → … → merge-cinema) and break evaluation.
-import * as uiModule from '../game-ui.js';
 
 // Hand the cinematic getters to game-ui at runtime (safe: game-ui does not
 // import this module, so there is no cycle). Keeps drawing FPS-cheap because
 // focus/size are animated once per frame here and only READ inside drawFlower.
-uiModule.attachCinemaHelpers({ getFocusValue, getBlurPx, getSizeMult });
+import * as uiModule from '../game-ui.js'; // safe: game-ui imports nothing from js/game/, so no ES cycle
 
 const { GW, GH, SLOWMO_SCALE, SLOWMO_DURATION, ATTRACT_FORCE, ATTRACT_MAX_SPEED,
         ATTRACT_MIN_DIST, ATTRACT_RANGE, MERGE_SIZE_STEP, MAX_MERGE_SIZE_MULT,
@@ -285,3 +282,12 @@ export function drawCinematicVignette(ctx) {
     ctx.fillRect(0, 0, GW, GH);
     ctx.restore();
 }
+
+// Attach cinematic helpers to game-ui AFTER all declarations (module bottom).
+uiModule.attachCinemaHelpers({
+    getFocusValue,
+    getBlurPx,
+    getSizeMult,
+    getComboMultiplier,
+    drawCinematicVignette,
+});

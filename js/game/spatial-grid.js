@@ -2,6 +2,7 @@
 import { state } from '../state.js';
 import { CONFIG } from '../config.js';
 import { getAllFlowersWithGenerated } from '../random-flowers.js';
+import { wakeFlower } from './sleep-system.js';
 
 const { MERGE_RADIUS_BONUS } = CONFIG;
 
@@ -125,6 +126,10 @@ export function checkMerges() {
             const radiusB = flowerBData.flowerType === 'orchid' ? flowerBData.radius * 0.5 : flowerBData.radius;
             
             if (dist < radiusA + radiusB + MERGE_RADIUS_BONUS) {
+                // FPS sleep-system: a merge is about to happen next to these
+                // flowers — make both mobile again so physics/cascade works.
+                wakeFlower(fa);
+                wakeFlower(fb);
                 if (typeof window.performMerge === 'function') {
                     window.performMerge(fa, fb, i, j);
                 }

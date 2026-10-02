@@ -5,6 +5,7 @@ import { getAllFlowersWithGenerated } from '../random-flowers.js';
 import { visualEffects } from '../visual-effects.js';
 import { removeFlower, createFlower } from './flower-mechanics.js';
 import { triggerSlowmo, awardMergeScore, setFocusTarget } from './merge-cinema.js';
+import { wakeNearMerge, wakeFlower } from './sleep-system.js';
 
 const { MERGE_RADIUS_BONUS } = CONFIG;
 
@@ -91,6 +92,12 @@ export function performMerge(fa, fb, idxA, idxB) {
     const mx = (fa.body.position.x + fb.body.position.x) / 2;
     const my = (fa.body.position.y + fb.body.position.y) / 2;
     const newLevel = fa.level + 1;
+
+    // FPS sleep-system: a merge is happening HERE — wake the participants and
+    // every sleeping flower nearby so the stack can physically react/settle.
+    wakeFlower(fa);
+    wakeFlower(fb);
+    wakeNearMerge(mx, my);
 
     // Cinematic slow-motion + combo coefficient chain (x2, x3, ...)
     triggerSlowmo(mx, my, newLevel);

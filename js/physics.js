@@ -3,6 +3,7 @@ import { state } from './state.js';
 import { CONFIG } from './config.js';
 // Remove import of getAllFlowers, import only getAllFlowersWithGenerated from random-flowers
 import { getAllFlowersWithGenerated } from './random-flowers.js';
+import { wakeFlower } from './game/sleep-system.js';
 
 const { VASE, GW, GH, GRAVITY_DENSITY_FACTOR, VIBRATION_STRENGTH, VIBRATION_RADIUS, MERGE_RADIUS_BONUS } = CONFIG;
 
@@ -81,6 +82,10 @@ function onCollision(event) {
         if (state.mergingSet.has(a.id) || state.mergingSet.has(b.id)) return;
         const fa = state.flowers[a.flowerIdx], fb = state.flowers[b.flowerIdx];
         if (!fa || !fb || !fa.body || !fb.body || fa.level === fb.level) return;
+        // FPS sleep-system: real contact means the flowers must be mobile again
+        // (repulsion forces are ignored by static bodies otherwise).
+        wakeFlower(fa);
+        wakeFlower(fb);
         // Note: spawning flag intentionally NOT checked for repulsion either
         // justSpawned kept here for repulsion to avoid pushing freshly merged flowers
         if (fa.justSpawned || fb.justSpawned) return;
@@ -202,7 +207,11 @@ export function applyForces(dt) {
     for (let i = 0; i < state.flowers.length; i += updateStep) {
         const f = state.flowers[i];
         if (!f || !f.body) continue;
-        
+
+        // FPS sleep-system: sleeping flowers are static bodies — skip ALL
+        // per-frame force/resonance/vibration math for them (main FPS win).
+        if (f.sleeping) continue;
+
         // Skip some updates based on probability for additional performance
         if (Math.random() > updateFrequency) continue;
 

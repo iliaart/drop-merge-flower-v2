@@ -17,7 +17,7 @@ import {
 // Import modules
 import { initGame as coreInitGame, restart as coreRestart, pickLevel, getPerformanceConfig, perfMonitor, checkGameOver } from './game/core.js';
 import { createFlower, removeFlower, cleanupFlowers, dropFlower } from './game/flower-mechanics.js';
-import { autoMergeExcessTypes, forceOverlapMerges, performMerge } from './game/merge-system.js';
+import { autoMergeExcessTypes, forceOverlapMerges, performMerge, processPendingMerges } from './game/merge-system.js';
 import { checkMerges } from './game/spatial-grid.js';
 import { updateFlowers, updateSquash } from './game/update-loop.js';
 import { updateCinema, applyMergeAttraction } from './game/merge-cinema.js';
@@ -145,6 +145,8 @@ function gameLoop(timestamp) {
         checkMerges();
         forceOverlapMerges();
     }
+    // Fire the queued cascade merge once the 0.3s gap elapsed (player can follow each merge)
+    processPendingMerges();
     autoMergeExcessTypes();
 
     if (state.dropCooldown > 0) {

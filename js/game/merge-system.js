@@ -9,6 +9,32 @@ import { wakeNearMerge, wakeFlower, wakeNewFlower } from './sleep-system.js';
 
 const { MERGE_RADIUS_BONUS } = CONFIG;
 
+/** Minimum delay (real seconds) between two merges — the player can actually
+ *  SEE each merge and its effects before the next chain merge fires. */
+export const MERGE_COOLDOWN = CONFIG.MERGE_GAP ?? 0.3;
+
+let lastMergeAt = -Infinity; // performance.now()/1000 of the last executed merge
+let pendingMerge = null;     // single queued follow-up merge (re-evaluated when it fires)
+
+/** Reset merge gating on restart so no stale cooldown/pending merge survives */
+export function resetMergeSystem() {
+    lastMergeAt = -Infinity;
+    pendingMerge = null;
+}
+
+/** Called from the game loop: re-fires a queued cascade merge after the 0.3s gap */
+export function processPendingMerges() {
+    if (!pendingMerge) return;
+    const p = pendingMerge;
+    pendingMerge = null;
+    const fa = state.flowers[p.a], fb = state.flowers[p.b];
+    // Positions may have changed while waiting — validate the pair once more
+    if (fa && fb && fa.body && fb.body && fa.level === fb.level &&
+        !state.mergingSet.has(fa.body.id) && !state.mergingSet.has(fb.body.id)) {
+        performMerge(fa, fb, p.a, p.b);
+    }
+}
+
 /**
  * Auto-merge the lowest-level flower type when distinct types exceed allowed count.
  * Picks the two lowest-level flowers at the smallest level and forces a merge,
@@ -43,7 +69,10 @@ export async function autoMergeExcessTypes() {
     if (!fa || !fb || state.mergingSet.has(fa.body.id) || state.mergingSet.has(fb.body.id)) return;
 
     if (typeof window.performMerge === 'function') {
-        window.performMerge(fa, fb, idxA, idxB);
+        // requestMerge enforces the 0.3s gap between consecutive merges
+        requestMerge(fa, fb, idxA, idxB);
+    } else {
+        performMerge(fa, fb, idxA, idxB);
     }
 }
 
@@ -75,17 +104,47 @@ export function forceOverlapMerges() {
             const radiusB = flowerBData.flowerType === 'orchid' ? flowerBData.radius * 0.5 : flowerBData.radius;
             // Only merge when truly overlapping (centers < sum of radii)
             if (dist < radiusA + radiusB) {
-                if (typeof window.performMerge === 'function') {
-                    window.performMerge(fa, fb, i, j);
-                }
+                requestMerge(fa, fb, i, j);
                 return;
             }
         }
     }
 }
 
+/** requestMerge — single entry point for every merge trigger source.
+ *  Enforces the 0.3s gap between consecutive merges: while the gap is active,
+ *  the pair is queued (one pending merge at a time) and re-validated when it fires. */
+export function requestMerge(fa, fb, idxA, idxB) {
+    if (!fa || !fb || !fa.body || !fb.body) return;
+    if (state.mergingSet.has(fa.body.id) || state.mergingSet.has(fb.body.id)) return;
+
+    const now = performance.now() / 1000;
+    if (now - lastMergeAt < MERGE_COOLDOWN) {
+        // Queue the follow-up cascade merge instead of firing it instantly
+        pendingMerge = { a: idxA, b: idxB };
+        return;
+    }
+    performMerge(fa, fb, idxA, idxB);
+}
+
+/** Merge sources that fire from collision/cleanup events may still reference the
+ *  legacy global `window.performMerge`. Point it at requestMerge so EVERY merge
+ *  path (physics collisionStart, spatial grid, auto-merge) goes through the
+ *  0.3s gate — otherwise cascades still happen instantly. */
+window.performMerge = requestMerge;
+
 export function performMerge(fa, fb, idxA, idxB) {
     if (!fa || !fb || !fa.body || !fb.body) return;
+
+    lastMergeAt = performance.now() / 1000;
+
+    // Resolve indices by BODY ID, not by the caller's stale array index.
+    // removeFlower leaves nulls until cleanupFlowers() compacts the array, so an
+    // index passed from a collision event can point at the WRONG flower and delete
+    // an innocent one (this is why flowers disappeared "without reason").
+    const realA = state.flowers.findIndex(f => f && f.body && f.body.id === fa.body.id);
+    const realB = state.flowers.findIndex(f => f && f.body && f.body.id === fb.body.id);
+    if (realA === -1 || realB === -1) return;
 
     state.mergingSet.add(fa.body.id);
     state.mergingSet.add(fb.body.id);
@@ -116,9 +175,9 @@ export function performMerge(fa, fb, idxA, idxB) {
     const colorA = flowerAData ? flowerAData.petalColor : '#FFAABB';
     const colorB = flowerBData ? flowerBData.petalColor : '#FFAABB';
 
-    // Remove the existing flowers
-    removeFlower(idxA);
-    removeFlower(idxB);
+    // Remove the existing flowers (validated indices — never the caller's stale ones)
+    removeFlower(realA);
+    removeFlower(realB);
 
     // Create the new flower
     const nf = createFlower(mx, my, newLevel);
@@ -229,4 +288,4 @@ function startLevelTransition() {
 }
 
 // Make function available globally as per project specification
-window.performMerge = performMerge;
+window.performMerge = requestMerge;

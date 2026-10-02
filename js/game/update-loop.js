@@ -3,6 +3,7 @@ import { state } from '../state.js';
 import { CONFIG } from '../config.js';
 import { getAllFlowersWithGenerated } from '../random-flowers.js';
 import { applyForces, updateAngularVelocity } from '../physics.js';
+import { updateSleep, wakeFlower } from './sleep-system.js';
 
 const { SQUASH_FREQ, SQUASH_DAMP } = CONFIG;
 

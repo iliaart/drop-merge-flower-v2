@@ -21,6 +21,7 @@ import { autoMergeExcessTypes, forceOverlapMerges, performMerge, processPendingM
 import { checkMerges } from './game/spatial-grid.js';
 import { updateFlowers, updateSquash } from './game/update-loop.js';
 import { updateCinema, applyMergeAttraction } from './game/merge-cinema.js';
+import { updateSleep, wakeNearMerge, wakeFlower } from './game/sleep-system.js';
 import { renderFrame } from './game/render-loop.js';
 import { shouldSkipFrame } from './game/utils.js';
 
@@ -111,6 +112,9 @@ function gameLoop(timestamp) {
         console.warn("state.Matter is not initialized, physics update skipped.");
     }
     applyForces(sdt);
+    // FPS optimization: flowers that just lie in the vase become static bodies
+    // (skipped by broadphase/collisions/integration) until something wakes them.
+    updateSleep(dt);
 
     // During slow-mo same-level flowers are cinematically attracted to each other
     applyMergeAttraction();
@@ -118,6 +122,8 @@ function gameLoop(timestamp) {
     // Update flower states
     for (const f of state.flowers) {
         if (!f) continue;
+        // Sleeping (static) flowers need zero per-frame physics bookkeeping.
+        if (f.sleeping) continue;
         updateAngularVelocity(f);
         if (f.spawning) {
             f.spawnTimer += sdt;
@@ -129,7 +135,7 @@ function gameLoop(timestamp) {
     // Update flower tails for dragged or kinematic flowers
     import('./game/render-loop.js').then(renderModule => {
         for (const f of state.flowers) {
-            if (!f) continue;
+            if (!f || f.sleeping) continue;
             renderModule.updateFlowerTail(f, currentTime);
         }
     });

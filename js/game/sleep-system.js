@@ -35,6 +35,10 @@ export function isFlowerAwake(f) {
 /** Wake a single flower (make it dynamic + resume animated drawing). */
 export function wakeFlower(f) {
     if (!f || !f.body || !f.sleeping) return;
+    // A flower under the player's finger is intentionally STATIC (kinematic
+    // drag — input.js/update-loop.js keep it static and move it via
+    // setPosition). Never make it fall while it is being dragged.
+    if (f === state.selectedFlower && state.isDragging) return;
     f.sleeping = false;
     f.settleTime = 0;
     state.Matter.Body.setStatic(f.body, false);

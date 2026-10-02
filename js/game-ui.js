@@ -45,23 +45,39 @@ export function drawCinematicVignetteOnce(ctx) {
 
 const { GW, GH, VASE, DANGER_Y, DROP_Y, GAME_OVER_GRACE } = CONFIG;
 
-export function drawBackground(ctx) {
-    const bg = ctx.createLinearGradient(0, 0, 0, GH);
-    bg.addColorStop(0, '#2a1f30');
-    bg.addColorStop(.3, '#1f1828');
-    bg.addColorStop(.7, '#1a1520');
-    bg.addColorStop(1, '#15101a');
-    ctx.fillStyle = bg;
-    ctx.fillRect(0, 0, GW, GH);
+// MOBILE FPS FIX: the background is completely static, but every frame we used
+// to build two gradients and fill the WHOLE canvas twice (a full-screen radial
+// gradient fill is extremely fill-rate heavy on mobile GPUs — one of the main
+// causes of wild freezes on phones while weak desktops with DPR=1 were fine).
+// The result is now baked ONCE into an offscreen canvas and blitted per frame.
+let _bgCache = null;
+export function invalidateBackgroundCache() { _bgCache = null; }
 
-    // Draw glow regardless of performance since we removed FPS limitations
-    const perfConfig = window.PERFORMANCE_CONFIG || {};
-    const glow = ctx.createRadialGradient(GW / 2, GH * .55, 50, GW / 2, GH * .55, 350);
-    glow.addColorStop(0, 'rgba(80,50,60,0.25)');
-    glow.addColorStop(.5, 'rgba(50,30,40,0.1)');
-    glow.addColorStop(1, 'rgba(0,0,0,0)');
-    ctx.fillStyle = glow;
-    ctx.fillRect(0, 0, GW, GH);
+export function drawBackground(ctx) {
+    if (!_bgCache) {
+        const oc = document.createElement('canvas');
+        oc.width = GW;
+        oc.height = GH;
+        const c = oc.getContext('2d');
+
+        const bg = c.createLinearGradient(0, 0, 0, GH);
+        bg.addColorStop(0, '#2a1f30');
+        bg.addColorStop(.3, '#1f1828');
+        bg.addColorStop(.7, '#1a1520');
+        bg.addColorStop(1, '#15101a');
+        c.fillStyle = bg;
+        c.fillRect(0, 0, GW, GH);
+
+        const glow = c.createRadialGradient(GW / 2, GH * .55, 50, GW / 2, GH * .55, 350);
+        glow.addColorStop(0, 'rgba(80,50,60,0.25)');
+        glow.addColorStop(.5, 'rgba(50,30,40,0.1)');
+        glow.addColorStop(1, 'rgba(0,0,0,0)');
+        c.fillStyle = glow;
+        c.fillRect(0, 0, GW, GH);
+
+        _bgCache = oc;
+    }
+    ctx.drawImage(_bgCache, 0, 0, GW, GH);
 }
 
 export function drawVase(ctx) {
@@ -468,7 +484,9 @@ export function drawFlower(ctx, flower, t) {
     }
 
     let breath = 0, sway = 0;
-    if (!shouldSimplifyAnimations) {
+    // Sleeping flowers are frozen: no breath/sway animation (matches the
+    // static physics body and lets us skip the per-frame stamen redraw too).
+    if (!shouldSimplifyAnimations && !flower.sleeping) {
         breath = Math.sin(t * 1.8 + flower.breathPhase) * .015;
         sway = Math.sin(t * 1.2 + flower.idlePhase) * .03;
     }
@@ -519,8 +537,12 @@ export function drawFlower(ctx, flower, t) {
     }
     ctx.drawImage(cache.canvas, -cache.cx * 2, -cache.cy * 2, cache.canvas.width, cache.canvas.height);
     
-    // Draw stamens regardless of performance since we removed FPS limitations
-    drawStamens(ctx, flower.level, r, t, flower.stamenPhase, flower.squashS);
+    // Stamens are animated per-frame (sway/pulse) — expensive on mobile.
+    // Sleeping flowers are visually frozen, so skip the whole stamen pass for
+    // them; it is re-drawn the moment the flower wakes up.
+    if (!flower.sleeping) {
+        drawStamens(ctx, flower.level, r, t, flower.stamenPhase, flower.squashS);
+    }
     
     ctx.restore();
     

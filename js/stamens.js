@@ -1,5 +1,6 @@
 // Stamens Drawing Module
 import { getAllFlowersWithGenerated } from './random-flowers.js';
+import { state } from './state.js';
 import { rgba, lighten, darken, TAU } from './utils.js';
 
 /** Draw animated stamens for a given flower level */
@@ -21,6 +22,17 @@ export function drawStamens(ctx, level, r, t, phase, squashS) {
     if (stCount === 0) return;
 
     const stamenType = f.stamenType || 'simple';
+
+    // MOBILE FPS FIX: an animated flower means a full procedural stamen pass
+    // (gradients + many strokes) PER FLOWER PER FRAME. On phones with DPR 2–3
+    // this was the main render cost causing wild freezes once the vase filled
+    // up. When the vase holds many flowers we animate only every third one
+    // (deterministic by level, so it never flickers); the rest are drawn in a
+    // frozen pose — visually invisible at these tiny sway amplitudes.
+    const totalFlowers = state.flowers ? state.flowers.length : 0;
+    if (totalFlowers > 14 && (level % 3) !== ((Math.floor(t * 2)) % 3)) {
+        t = 0; // static pose: no per-frame sway/pulse computation
+    }
     const stLen = r * (f.stamenLen || 0.25);
     const stColor = f.stamenColor || f.centerColor2;
     const antherSize = f.antherSize || 1.0;

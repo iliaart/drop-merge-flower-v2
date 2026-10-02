@@ -3,7 +3,7 @@ import { state } from './state.js';
 import { CONFIG } from './config.js';
 import { dropFlower } from './game.js';
 import { getAllFlowersWithGenerated } from './random-flowers.js';
-import { wakeNewFlower } from './game/sleep-system.js';
+import { wakeNewFlower, wakeFlower } from './game/sleep-system.js';
 
 const { GW, GH } = CONFIG;
 
@@ -333,7 +333,23 @@ export function setupInput() {
                 state.selectedFlower = null;
             }
         } else {
-            // If we weren't dragging a flower, just reset the selection
+            // If we weren't dragging a flower, just reset the selection.
+            // BUGFIX "flower stays frozen after click": mousedown on an existing
+            // (sleeping = static) flower makes it STATIC for kinematic dragging.
+            // A quick tap never moves the pointer, so no new body is created and
+            // the old one used to remain static forever — visibly glued in place
+            // (while merged flowers get wakeNewFlower() and fall normally).
+            // Wake the tapped flower so gravity takes over again; mechanics
+            // unchanged: it still falls and settles where it was released.
+            if (state.selectedFlower && state.isDragging) {
+                const f = state.selectedFlower;
+                if (f.body) {
+                    // Restore real bounds left stale by setStatic(true), go
+                    // dynamic, and re-enable gravity so it actually falls.
+                    wakeNewFlower(f);
+                    f.body.gravityScale = f.originalGravityScale || 1;
+                }
+            }
             state.selectedFlower = null;
         }
         state.isDragging = false;
@@ -347,6 +363,9 @@ export function setupInput() {
                 const flowerBody = state.selectedFlower.body;
                 // Restore original gravity scale
                 flowerBody.gravityScale = state.selectedFlower.originalGravityScale || 1;
+                // Same fix as mouseup: leave the body dynamic (with repaired
+                // bounds), not glued static.
+                wakeNewFlower(state.selectedFlower);
             }
             state.isDragging = false;
         }
@@ -483,9 +502,23 @@ export function setupInput() {
                 
                 // Make sure gravity is enabled for the new flower
                 newFlower.body.gravityScale = flowerBeingDragged.originalGravityScale || 1;
-                
+
                 // Ensure the new flower is not selected - this is crucial to prevent yellow circle
                 state.selectedFlower = null;
+            } else if (flowerBeingDragged) {
+                // BUGFIX "flower stays frozen after tap" (touch): createFlower()
+                // failed — wake the original dragged body so it falls under
+                // gravity instead of remaining static forever.
+                wakeNewFlower(flowerBeingDragged);
+                flowerBody.gravityScale = flowerBeingDragged.originalGravityScale || 1;
+            }
+        } else if (state.isDragging && state.selectedFlower) {
+            // Same fix as mouseup: a quick tap on an existing flower never
+            // recreates the body, so wake it — otherwise it stays glued in place.
+            const f = state.selectedFlower;
+            if (f.body) {
+                wakeNewFlower(f);
+                f.body.gravityScale = f.originalGravityScale || 1;
             }
         }
         state.isDragging = false;

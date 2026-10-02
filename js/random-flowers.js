@@ -34,6 +34,9 @@ let generationCounter = 0;
 // Maximum number of recent colors to track for diversity
 const MAX_RECENT_COLORS = 10;
 
+// Throttle timestamp for the (debug-only) flower dump log — see logGeneratedFlowers
+let _lastFlowerLogAt = 0;
+
 /**
  * Generate harmonious color palette based on color theory
  * @returns {object} color palette with primary, secondary, accent, etc.
@@ -265,17 +268,22 @@ function generateRandomFlower() {
 
 /**
  * Get all generated flowers
- * @returns {Array} Array of generated flower objects
+ * FPS FIX: returns the live array reference instead of copying it. The old
+ * `[...generatedFlowers]` allocated a new 50-entry array on EVERY call, and
+ * this function is called from merge checks / render / UI every frame — that
+ * per-frame allocation caused GC churn and the FPS drop during merges/effects.
+ * Treat the returned array as READ-ONLY.
+ * @returns {Array} Array of generated flower objects (read-only view)
  */
 function getAllFlowersWithGenerated() {
-    return [...generatedFlowers];
+    return generatedFlowers;
 }
 
 /**
  * Reset generated flowers pool and color tracking
  */
 function resetGeneratedFlowers() {
-    generatedFlowers = [];
+    generatedFlowers.length = 0; // keep the same array reference (see note above)
     generationCounter = 0; // Reset the generation counter as well
     // Reset the recent colors tracking to allow full color diversity again
     for (let key in recentColors) {
@@ -311,6 +319,10 @@ function resetGeneratedFlowers() {
 
 /**
  * Generate a batch of random flowers
+ * NOTE: debug logging was REMOVED from here on purpose. This function is called
+ * during boot AND on every restart/initGame — the old auto-`logGeneratedFlowers`
+ * dumped 50 console.table groups each time (the "flowers generated 3 times" spam),
+ * which itself froze the page. Use window.logGeneratedFlowers() manually if needed.
  * @param {number} count - Number of flowers to generate
  */
 function generateRandomFlowerBatch(count) {
@@ -320,22 +332,21 @@ function generateRandomFlowerBatch(count) {
         generatedFlowers.push(flower);
         addToRecentFlowers(flower);
     }
-    
-    // Automatically log flower info if we've generated 50 flowers
-    if (count === 50) {
-        setTimeout(() => {
-            logGeneratedFlowers(generatedFlowers);
-        }, 100); // Delay to ensure all flowers are processed
-    }
 }
 
 // Function to log all generated flowers with their properties
+// DEBUG ONLY — never call this from the game loop or batch generation.
 function logGeneratedFlowers(allFlowers) {
     // Проверяем, определен ли параметр allFlowers
     if (!allFlowers) {
         // Если allFlowers не передан, используем глобальный массив generatedFlowers
         allFlowers = generatedFlowers;
     }
+    // Throttle: repeated calls right after each other (boot + initGame + restart)
+    // used to print the full 50-flower dump 2-3 times per session.
+    const now = Date.now();
+    if (now - _lastFlowerLogAt < 5000) return;
+    _lastFlowerLogAt = now;
     
     console.log(`%c=== Generated Flowers (${allFlowers.length} total) ===`, 'color: #4CAF50; font-weight: bold; font-size: 16px;');
     
@@ -390,13 +401,9 @@ if (typeof window !== 'undefined') {
             generatedFlowers.push(flower);
             addToRecentFlowers(flower);
         }
-        
-        // Automatically log flower info if we've generated 50 flowers
-        if (count === 50) {
-            setTimeout(() => {
-                logGeneratedFlowers(generatedFlowers);
-            }, 100); // Delay to ensure all flowers are processed
-        }
+        // FPS FIX: removed the automatic logGeneratedFlowers() dump here — it ran
+        // on every 50-flower batch (boot + initGame + restart), spamming the
+        // console with hundreds of table groups and freezing the page.
     };
     window.getAllFlowersWithGenerated = getAllFlowersWithGenerated;
     window.resetGeneratedFlowers = resetGeneratedFlowers;

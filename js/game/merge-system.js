@@ -126,6 +126,12 @@ export function requestMerge(fa, fb, idxA, idxB) {
     performMerge(fa, fb, idxA, idxB);
 }
 
+/** Merge sources that fire from collision/cleanup events may still reference the
+ *  legacy global `window.performMerge`. Point it at requestMerge so EVERY merge
+ *  path (physics collisionStart, spatial grid, auto-merge) goes through the
+ *  0.3s gate — otherwise cascades still happen instantly. */
+window.performMerge = requestMerge;
+
 export function performMerge(fa, fb, idxA, idxB) {
     if (!fa || !fb || !fa.body || !fb.body) return;
 

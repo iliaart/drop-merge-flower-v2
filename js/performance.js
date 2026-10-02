@@ -14,6 +14,7 @@ export class PerformanceOptimizer {
         };
         
         this.qualityLevel = 'high'; // 'low', 'medium', 'high'
+        this.startTime = performance.now(); // used to ignore boot warm-up FPS samples
         this.lastAdjustment = performance.now();
         this.adjustmentInterval = 5000; // Adjust every 5 seconds
         this.fpsHistory = [];
@@ -68,6 +69,17 @@ export class PerformanceOptimizer {
         
         // Adjust quality every few seconds based on performance
         if (now - this.lastAdjustment > this.adjustmentInterval) {
+            // FPS FIX: do NOT react to the first samples after load. Boot does
+            // heavy work (50 flower generations, palette loading, shader/GPU warmup)
+            // which produces 1-2 legitimately low-FPS seconds. The old logic then
+            // dropped quality to 'low' and kept it there, so the game felt frozen
+            // as soon as merge effects appeared. Warm-up samples are discarded.
+            const elapsedSinceStart = now - (this.startTime || now);
+            if (elapsedSinceStart < 6000) {
+                this.fpsHistory.length = 0;
+                this.lastAdjustment = now;
+                return;
+            }
             this.adjustQuality();
             this.lastAdjustment = now;
         }
@@ -75,7 +87,7 @@ export class PerformanceOptimizer {
 
     // Adjust game quality based on performance metrics
     adjustQuality() {
-        if (this.fpsHistory.length === 0) return;
+        if (this.fpsHistory.length < 3) return; // need a stable trend, not one bad frame
 
         // Calculate average FPS from history
         const avgFPS = this.fpsHistory.reduce((sum, fps) => sum + fps, 0) / this.fpsHistory.length;

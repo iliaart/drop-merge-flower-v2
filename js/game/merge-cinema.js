@@ -39,24 +39,27 @@ export function getComboMultiplier() {
     return 1 + Math.max(0, state.comboCount);
 }
 
-/** Current bonus-bar fill target (0..1) derived from active consecutive merges */
+/** Current bonus-bar fill target (0..1) derived from active consecutive merges.
+ *  Uses REAL time so the chain doesn't expire during the slowed cinematic itself. */
 export function getBonusTarget() {
-    const remaining = Math.max(0, state.lastMergeTime + BONUS_WINDOW - state.time);
+    const remaining = Math.max(0, state.lastMergeRealTime + BONUS_WINDOW - (state.realTime || 0));
     return clamp(state.comboCount / BONUS_MAX_FILL, 0, 1) * (remaining > 0 ? 1 : 0);
 }
 
 /** Start/extend a cinematic slow-motion around a merge event */
 export function triggerSlowmo(x, y, level) {
-    // Chain detection: second merge right after the first one (same or next tier)
-    if (state.time - state.lastMergeTime <= BONUS_WINDOW && level >= state.lastMergeLevel) {
+    // Chain detection: second merge shortly after the first one (same or next tier).
+    // Window matches the 0.3s merge gap + reaction time so normal cascades still combo.
+    if (state.realTime - state.lastMergeRealTime <= 0.6 && level >= state.lastMergeLevel) {
         state.comboCount++;
     } else {
         state.comboCount = 0;
     }
     state.lastMergeTime = state.time;
+    state.lastMergeRealTime = state.realTime || 0;
     state.lastMergeLevel = level;
 
-    // Halved slowdown duration — the cinematic moment is short and snappy
+    // Gentle slowdown: mild, short and smooth (harsh slow-mo felt like an FPS drop)
     state.slowmoTimer = Math.max(state.slowmoTimer, SLOWMO_DURATION);
 
     // Floating "xN" coefficient popup when the chain continues
@@ -103,8 +106,10 @@ export function updateCinema(dtReal, realTime) {
         state.slowmoTimer -= dtReal;
         target = SLOWMO_SCALE;
     }
-    // Smooth lerp of time back to the normal course of events (fast return)
-    state.timeScale = lerp(state.timeScale, target, Math.min(1, dtReal * 10));
+    // Smooth ramp INTO slow-mo and back to normal time — no instant jumps
+    // (a hard time-scale snap reads as a stutter / "FPS drop" to the player)
+    const rampRate = Math.min(1, dtReal * (CONFIG.SLOWMO_RAMP_RATE || 7));
+    state.timeScale = lerp(state.timeScale, target, rampRate);
     if (Math.abs(state.timeScale - target) < 0.005) state.timeScale = target;
 
     // Animated bonus bar fill + flash decay
@@ -119,6 +124,11 @@ export function updateCinema(dtReal, realTime) {
 
     // ── Per-flower cinematic state, updated exactly once per frame ──────────
     const cinematic = isCinematicActive();
+    // Time-based (frame-rate independent) easing rates — the old fixed per-frame
+    // lerp factors compounded with mergeDepth made sizes creep up and never settle.
+    const focusUpRate = Math.min(1, dtReal * 8);   // focus eases in over ~0.15s
+    const focusDownRate = Math.min(1, dtReal * 4); // softer, slower release
+    const sizeRate = Math.min(1, dtReal * 3);      // gentle ~0.3s size settle
     const flowers = state.flowers;
     for (let i = 0; i < flowers.length; i++) {
         const f = flowers[i];
@@ -135,19 +145,20 @@ export function updateCinema(dtReal, realTime) {
                 fTarget = 0.45; // background flowers: soft blur only, never a black silhouette
             }
         }
-        // Fast transfer: strong lerp factor => focus jumps to the merged flower within ~2-3 frames
         const cur = f.focus ?? fTarget;
-        const rate = fTarget > cur ? 0.5 : 0.28;
+        const rate = fTarget > cur ? focusUpRate : focusDownRate;
         f.focus = lerp(cur, fTarget, rate);
         if (Math.abs(f.focus - fTarget) < 0.01) f.focus = fTarget;
 
-        // Size multiplier: merged flowers stay slightly bigger (lerped in).
-        // When idle (depth 0) snap straight to 1 without allocating anything.
+        // Size multiplier: merged flowers are bigger by EXACTLY their merge depth
+        // (capped). The lerp only smooths the transition toward that fixed target —
+        // it can no longer grow "without reason" and always returns to 1 at depth 0.
         const depth = f.mergeDepth || 0;
         const sTarget = depth > 0 ? Math.min(MAX_MERGE_SIZE_MULT, 1 + depth * MERGE_SIZE_STEP) : 1;
-        if (f.sizeMult !== sTarget) {
-            f.sizeMult = lerp(f.sizeMult ?? 1, sTarget, 0.08);
-            if (Math.abs(f.sizeMult - sTarget) < 0.002) f.sizeMult = sTarget;
+        const curS = f.sizeMult ?? sTarget;
+        if (curS !== sTarget) {
+            const next = lerp(curS, sTarget, sizeRate);
+            f.sizeMult = Math.abs(next - sTarget) < 0.002 ? sTarget : next;
         }
     }
 }
@@ -166,7 +177,11 @@ export function applyMergeAttraction() {
     }
 
     const { Body } = state.Matter;
-    const maxLevel = getAllFlowersWithGenerated().length - 1; // tiny array copy, fine per-frame
+    // FPS FIX: previously this called getAllFlowersWithGenerated() EVERY frame,
+    // which copies the full 50-entry flower catalog (allocation + GC churn).
+    // The length is cached once per session instead.
+    if (_maxLevelCache < 0) _maxLevelCache = getAllFlowersWithGenerated().length - 1;
+    const maxLevel = _maxLevelCache;
     const flowers = state.flowers;
     const n = flowers.length;
 
@@ -216,19 +231,29 @@ export function applyMergeAttraction() {
             fb.attracting = true;
             pairs++;
 
-            // Velocity cap for a smooth magnetic glide (no collisions/jitter)
-            capAttractSpeed(fa.body);
-            capAttractSpeed(fb.body);
+            // Velocity cap for a smooth magnetic glide (no collisions/jitter).
+            // Matter velocity is px/STEP — normalize by delta so slow-mo frames
+            // don't effectively raise the cap and cause jittery motion.
+            const delta = state.engine?.timing?.lastDelta || 16.666;
+            capAttractSpeed(fa.body, delta);
+            capAttractSpeed(fb.body, delta);
         }
     }
 }
 
-function capAttractSpeed(body) {
+// Cached flower-catalog size for the attraction scan (see FPS FIX above)
+let _maxLevelCache = -1;
+export function invalidateMaxLevelCache() { _maxLevelCache = -1; }
+
+function capAttractSpeed(body, delta = 16.666) {
     const { Body } = state.Matter;
     const v = body.velocity;
     const sp = Math.hypot(v.x, v.y);
-    if (sp > ATTRACT_MAX_SPEED) {
-        const k = ATTRACT_MAX_SPEED / sp;
+    // Matter velocity is px/step — scale the cap with the current frame delta
+    // so slow-mo (smaller steps) doesn't effectively raise the speed limit.
+    const stepCap = ATTRACT_MAX_SPEED * (delta / 16.666);
+    if (sp > stepCap) {
+        const k = stepCap / sp;
         Body.setVelocity(body, { x: v.x * k, y: v.y * k });
     }
 }

@@ -63,6 +63,7 @@ export const state = {
     baseScore: 0,          // raw points without coefficients
     lastMergeTime: -999,   // state.time of the previous merge
     lastMergeLevel: -1,    // level produced by the previous merge
+    lastMergeRealTime: -999, // real-time seconds of the previous merge (combo chain window)
     comboCount: 0,         // consecutive chain merges (x1 has 0 extra)
     bonusFill: 0,          // animated 0..1 fill of the bonus bar
     bonusFlash: 0,         // flash intensity when coefficient increases

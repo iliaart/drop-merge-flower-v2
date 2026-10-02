@@ -30,6 +30,19 @@ export function createFlower(x, y, level) {
         density: .0015 + level * .0004,
         label: 'flower', frictionStatic: 0, sleepThreshold: 60,
     });
+    // BUGFIX "flower appears from nowhere at the origin (0,0)":
+    // Matter.js 0.19 Body.setStatic() recomputes bounds via Bounds.create()
+    // (= [±Infinity]) and clamps position.bounds to that EMPTY interval —
+    // [-0, 0] — so every dynamic→static switch teleported the body to (0,0),
+    // where it then fell through the world as a fast dynamic body. This is
+    // exactly what happened during freezes on mobile: the long delta spike put
+    // sleeping flowers over the settle threshold / dragged them out of clamp
+    // ranges, setStatic(true) fired en masse and flowers materialized at the
+    // origin. Fix: bodies are born static (never see the broken transition),
+    // and wakeFlower() restores the real bounds right before going dynamic.
+    if (state.Matter && state.Matter.Body && typeof state.Matter.Body.setStatic === 'function') {
+        state.Matter.Body.setStatic(body, true);
+    }
     body.flowerIdx = state.flowers.length;
     World.add(state.world, body);
 
@@ -39,6 +52,8 @@ export function createFlower(x, y, level) {
     // Set the required properties for the flower
     flower.body = body;
     flower.level = level;
+    flower.sleeping = true;   // static until something wakes it (sleep-system.js)
+    flower.settleTime = 0;
     flower.justSpawned = true;
     flower.spawning = false;
     flower.spawnScale = 1;

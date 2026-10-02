@@ -3,8 +3,36 @@ import { state } from './state.js';
 import { CONFIG } from './config.js';
 import { dropFlower } from './game.js';
 import { getAllFlowersWithGenerated } from './random-flowers.js';
+import { wakeNewFlower } from './game/sleep-system.js';
 
 const { GW, GH } = CONFIG;
+
+/**
+ * BUGFIX "flower appears at (0,0)": Matter.js 0.19 Body.setStatic(true) leaves
+ * position.bounds as an EMPTY interval [-0, 0]; while the body is static every
+ * setPosition()/setVelocity() clamps its result to that empty bounds and the
+ * flower teleports to the origin. Dragged flowers are kept static (kinematic),
+ * so we must repair the bounds right after each move/velocity reset.
+ */
+function dragBodyTo(flowerBody, x, y) {
+    const M = state.Matter;
+    M.Body.setPosition(flowerBody, { x, y });
+    if (M.Bounds && typeof M.Bounds.update === 'function') {
+        flowerBody.bounds = M.Bounds.create(flowerBody.position);
+        M.Bounds.update(flowerBody.bounds, flowerBody.vertices, { x: 0, y: 0 });
+    }
+}
+
+function clearDragVelocity(flowerBody) {
+    const M = state.Matter;
+    M.Body.setVelocity(flowerBody, { x: 0, y: 0 });
+    if (M.Bounds && typeof M.Bounds.update === 'function') {
+        // setVelocity on a static body with empty bounds re-clamped position to
+        // (0,0) — put it back and rebuild valid bounds around the real position.
+        if (flowerBody.position.x === 0 && flowerBody.position.y === 0) return;
+        flowerBody.bounds = M.Bounds.create(flowerBody.position);
+    }
+}
 
 // MOBILE FPS FIX: many phones report devicePixelRatio 2.5–3, which meant the
 // backing store was up to 9× larger than the logical scene (e.g. 4K pixels for
@@ -178,14 +206,16 @@ export function setupInput() {
             const clampedX = clamp(p.x, CONFIG.VASE.l + radius, CONFIG.VASE.r - radius);
             const clampedY = clamp(p.y, CONFIG.VASE.t + radius, CONFIG.VASE.b - radius);
 
-            // Move the flower to the clamped mouse position
-            state.Matter.Body.setPosition(flowerBody, { x: clampedX, y: clampedY });
+            // Move the flower to the clamped mouse position (bounds-safe: a plain
+            // setPosition on this static body would clamp into the empty bounds
+            // left by setStatic and teleport it to (0,0))
+            dragBodyTo(flowerBody, clampedX, clampedY);
             // Ensure gravity is disabled while dragging
             flowerBody.gravityScale = 0;
             // Ensure the body remains kinematic during dragging
             state.Matter.Body.setStatic(flowerBody, true);
             // Reset velocity to prevent physics interference
-            state.Matter.Body.setVelocity(flowerBody, { x: 0, y: 0 });
+            clearDragVelocity(flowerBody);
             state.Matter.Body.setAngularVelocity(flowerBody, 0);
         }
     });
@@ -286,6 +316,11 @@ export function setupInput() {
             // Create a new flower at the same position with preserved rotation
             const newFlower = window.createFlower(position.x, position.y, level);
             if (newFlower) {
+                // Wake it immediately: createFlower spawns a static body whose
+                // bounds are empty; wakeNewFlower() goes dynamic AND rebuilds
+                // valid bounds, so the dropped flower falls from where it was
+                // released instead of popping up at (0,0).
+                wakeNewFlower(newFlower);
                 // Preserve the rotation state from the old flower
                 state.Matter.Body.setAngle(newFlower.body, currentAngle);
                 state.Matter.Body.setAngularVelocity(newFlower.body, currentAngularVelocity);

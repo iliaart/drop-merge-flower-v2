@@ -5,7 +5,7 @@ import { getAllFlowersWithGenerated } from '../random-flowers.js';
 import { visualEffects } from '../visual-effects.js';
 import { removeFlower, createFlower } from './flower-mechanics.js';
 import { triggerSlowmo, awardMergeScore, setFocusTarget } from './merge-cinema.js';
-import { wakeNearMerge, wakeFlower } from './sleep-system.js';
+import { wakeNearMerge, wakeFlower, wakeNewFlower } from './sleep-system.js';
 
 const { MERGE_RADIUS_BONUS } = CONFIG;
 
@@ -182,6 +182,10 @@ export function performMerge(fa, fb, idxA, idxB) {
     // Create the new flower
     const nf = createFlower(mx, my, newLevel);
     if (nf) {
+        // Merged flowers must be physical IMMEDIATELY (fall/settle/cascade).
+        // createFlower() now spawns static bodies (bounds-bug fix), so wake it
+        // right away — this also repairs the stale empty bounds setStatic left.
+        wakeNewFlower(nf);
         nf.spawning = false;      // merged flower appears instantly — no spawn pop-in delay
         nf.mergeGlow = 1;
         nf.mergeDepth = newDepth;

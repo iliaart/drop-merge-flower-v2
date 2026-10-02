@@ -26,6 +26,11 @@ export async function updateFlowers() {
         
         // Update physics if not being dragged
         if (state.selectedFlower !== f) {
+            // FPS sleep-system: sleeping flowers are intentionally STATIC —
+            // do NOT force them dynamic here (that fought the sleep system and
+            // made every flower in the vase re-simulate each frame).
+            if (f.sleeping) continue;
+
             // Ensure gravity is enabled for non-dragged flowers
             if (f.body && typeof f.body.gravityScale !== 'undefined') {
                 const flowerData = allFlowers[f.level];
@@ -34,13 +39,6 @@ export async function updateFlowers() {
                     
                     const densityModifier = 1 + (flowerRadius - avgRadius) * CONFIG.GRAVITY_DENSITY_FACTOR / avgRadius;
                     f.body.gravityScale = densityModifier;
-                    
-                    // Ensure the body is not static when not dragging
-                    // Check if Matter and Body.getStatic exist before calling
-                    const hasMatterBody = state.Matter && state.Matter.Body && typeof state.Matter.Body.getStatic === 'function';
-                    if (hasMatterBody && state.Matter.Body.getStatic(f.body)) {
-                        state.Matter.Body.setStatic(f.body, false);
-                    }
                 }
             }
         } else {

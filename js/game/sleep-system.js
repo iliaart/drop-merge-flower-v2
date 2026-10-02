@@ -40,6 +40,31 @@ export function wakeFlower(f) {
     state.Matter.Body.setStatic(f.body, false);
 }
 
+/**
+ * Wake a freshly created flower so it starts falling under gravity.
+ * Unlike wakeFlower(), this also clears justSpawned and repairs the bounds:
+ * Matter.js 0.19 Body.setStatic(true) leaves position.bounds as an EMPTY
+ * interval ([-0, 0]) which clamps every setPosition/setVelocity to the origin
+ * (0,0) while the body is static — so after going dynamic we must rebuild the
+ * real bounds around the current position before the first Engine.update().
+ */
+export function wakeNewFlower(f) {
+    if (!f || !f.body) return;
+    const hadStaleBounds = f.sleeping;
+    f.sleeping = false;
+    f.settleTime = 0;
+    f.justSpawned = false;
+    const { Body, Bounds } = state.Matter;
+    Body.setStatic(f.body, false);
+    if (hadStaleBounds && Bounds && typeof Bounds.update === 'function') {
+        // Rebuild valid bounds (mirrors what Bodies.fromVertices does internally):
+        // without this the empty [-0,0] bounds keep teleporting the body to (0,0).
+        const b = f.body;
+        b.bounds = Bounds.create(b.position);
+        Bounds.update(b.bounds, b.vertices, b.velocity);
+    }
+}
+
 /** Wake every sleeping flower (used on restart / level transition). */
 export function wakeAllFlowers() {
     for (const f of state.flowers) wakeFlower(f);

@@ -12,6 +12,16 @@ export function initPhysics() {
     const { Engine, World, Bodies, Events } = state.Matter;
 
     state.engine = Engine.create({ gravity: { x: 0, y: CONFIG.GRAVITY } });
+
+    // MOBILE FPS FIX: Matter.js defaults to 6/4/4 solver iterations. On phones
+    // (CPU-bound physics with a full vase of dynamic bodies) that is far more
+    // accuracy than this game needs; drops in the vase don't jitter visibly.
+    // Lowering iterations roughly halves collision-solver time per step.
+    if (/Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent)) {
+        state.engine.positionIterations = 4;
+        state.engine.velocityIterations = 3;
+        state.engine.constraintIterations = 2;
+    }
     state.world = state.engine.world;
 
     const wallOpts = { isStatic: true, friction: .4, restitution: .2, render: { fillStyle: 'transparent', strokeStyle: 'transparent', visible: false } }; // Указал полную прозрачность

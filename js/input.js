@@ -6,9 +6,25 @@ import { getAllFlowersWithGenerated } from './random-flowers.js';
 
 const { GW, GH } = CONFIG;
 
+// MOBILE FPS FIX: many phones report devicePixelRatio 2.5–3, which meant the
+// backing store was up to 9× larger than the logical scene (e.g. 4K pixels for
+// a 500×800 game). Fill-rate bound drawing (gradients, drawImage) then froze
+// frames every few seconds. Weak desktop PCs were fine because their DPR is 1.
+// We cap the backing-store scale: high-end desktop keeps full sharpness,
+// mobile/low-DPR devices are clamped to ~2 (and low-end devices to 1.5).
+function getRenderScale() {
+    const raw = window.devicePixelRatio || 1;
+    const isMobile = /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+    const cores = navigator.hardwareConcurrency || (isMobile ? 4 : 8);
+    if (isMobile || raw <= 1.5) {
+        return cores >= 8 ? Math.min(raw, 2) : Math.min(raw, 1.5);
+    }
+    return Math.min(raw, 3);
+}
+
 /** Resize canvas to fit viewport while maintaining game aspect ratio */
 export function resizeCanvas() {
-    const dpr = window.devicePixelRatio || 1;
+    const dpr = getRenderScale();
     const vw = window.innerWidth;
     const vh = window.innerHeight;
 

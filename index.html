@@ -253,13 +253,9 @@
             }
         }
 
-        // Run performance optimization loop
-        function perfLoop() {
-            perfOptimizer.update();
-            memoryManager.update();
-            requestAnimationFrame(perfLoop);
-        }
-        perfLoop();
+        // Performance & memory managers are ticked from the main game loop
+        // (a second requestAnimationFrame loop here double-counted frames and
+        // made the measured FPS exactly 2x too high, breaking auto-quality).
 
         boot();
     </script>

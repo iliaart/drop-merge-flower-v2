@@ -20,7 +20,7 @@ import { createFlower, removeFlower, cleanupFlowers, dropFlower } from './game/f
 import { autoMergeExcessTypes, forceOverlapMerges, performMerge } from './game/merge-system.js';
 import { checkMerges } from './game/spatial-grid.js';
 import { updateFlowers, updateSquash } from './game/update-loop.js';
-import { renderFrame } from './game/render-loop.js';
+import { renderFrame, updateFlowerTail } from './game/render-loop.js';
 import { shouldSkipFrame } from './game/utils.js';
 
 const { GW, GH, VASE, DANGER_Y, DROP_Y, MAX_LEVEL, GAME_OVER_GRACE, MERGE_RADIUS_BONUS, SQUASH_FREQ, SQUASH_DAMP, MAX_FLOWER_TYPES, MAX_TYPES_AT_FULL, ADAPTIVE_FILL_THRESHOLD } = CONFIG;
@@ -119,12 +119,11 @@ function gameLoop(timestamp) {
     }
 
     // Update flower tails for dragged or kinematic flowers
-    import('./game/render-loop.js').then(renderModule => {
-        for (const f of state.flowers) {
-            if (!f) continue;
-            renderModule.updateFlowerTail(f, currentTime);
-        }
-    });
+    // (static import — dynamic import() here allocated a Promise every frame)
+    for (const f of state.flowers) {
+        if (!f) continue;
+        updateFlowerTail(f, currentTime);
+    }
 
     // Perform merge checks less frequently based on performance config
     if (Math.floor(state.time * 10) % perfConfig.mergeCheckFreq === 0) { // Check every N frames based on performance

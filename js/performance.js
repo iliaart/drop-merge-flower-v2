@@ -17,7 +17,10 @@ export class PerformanceOptimizer {
         this.lastAdjustment = performance.now();
         this.adjustmentInterval = 5000; // Adjust every 5 seconds
         this.fpsHistory = [];
-        this.targetFPS = Infinity; // Remove FPS cap
+        // Real target for adaptive quality: with Infinity every downgrade
+        // condition in adjustQuality() was dead code (quality only ever went up).
+        this.targetFPS = 60;
+        this.baseTargetFPS = 60;
         this.frameSkipCounter = 0;
         this.frameSkipThreshold = 0; // Will be calculated dynamically
         this.batteryLevel = null;
@@ -155,54 +158,84 @@ export class PerformanceOptimizer {
     
     // Handle battery status changes
     handleBatteryStatusChange() {
-        // If battery is low, apply more aggressive optimization
-        if (this.batteryLevel < 0.2 && !navigator.onLine) {
+        // Low battery => aggressive savings (regardless of connectivity:
+        // the old `&& !navigator.onLine` made this branch nearly unreachable)
+        if (this.batteryLevel !== null && this.batteryLevel < 0.2) {
             if (this.qualityLevel !== 'low') {
                 this.setQualityLevel('low');
                 console.log('Power Saving: Reduced to low quality due to low battery');
             }
-            this.targetFPS = Math.min(this.targetFPS, 20);
-        } else if (this.batteryLevel < 0.5 && !navigator.onLine) {
+            this.targetFPS = Math.min(this.baseTargetFPS, 30);
+        } else if (this.batteryLevel !== null && this.batteryLevel < 0.5) {
             if (this.qualityLevel === 'high') {
                 this.setQualityLevel('medium');
                 console.log('Power Saving: Reduced to medium quality due to moderate battery');
             }
-            this.targetFPS = Math.min(this.targetFPS, 25);
+            this.targetFPS = Math.min(this.baseTargetFPS, 45);
+        } else {
+            this.targetFPS = this.baseTargetFPS;
         }
     }
 
     // Set quality level and adjust corresponding parameters
     setQualityLevel(level) {
+        const changed = this.qualityLevel !== level;
         this.qualityLevel = level;
-        const baseConfig = window.PERFORMANCE_CONFIG || { maxParticles: 500, mergeCheckFreq: 2, maxFlowersForMerges: 60 }; // Removed ambientMotes as they are not merge-related effects
-        
+        // Keep the ORIGINAL device profile as base — previously each call
+        // multiplied the already-reduced config (0.6/0.3 of previous value),
+        // so quality could never be restored and configs decayed on every toggle.
+        if (!this.basePerfConfig) {
+            this.basePerfConfig = {
+                maxParticles: 500, mergeCheckFreq: 2, maxFlowersForMerges: 60,
+                ...(window.PERFORMANCE_CONFIG || {})
+            };
+            if (this.isMobile) {
+                this.basePerfConfig.maxParticles = Math.min(this.basePerfConfig.maxParticles, 300);
+                this.basePerfConfig.mergeCheckFreq = Math.max(this.basePerfConfig.mergeCheckFreq || 2, 3);
+                this.basePerfConfig.maxFlowersForMerges = Math.min(this.basePerfConfig.maxFlowersForMerges || 60, 40);
+            }
+        }
+        const baseConfig = this.basePerfConfig;
+
         switch(level) {
             case 'high':
-                window.PERFORMANCE_CONFIG = { ...baseConfig, 
-                    maxParticles: baseConfig.maxParticles || 500, 
-                    mergeCheckFreq: baseConfig.mergeCheckFreq || 2,
-                    maxFlowersForMerges: baseConfig.maxFlowersForMerges || 60
+                window.PERFORMANCE_CONFIG = { ...baseConfig,
+                    maxParticles: baseConfig.maxParticles,
+                    mergeCheckFreq: baseConfig.mergeCheckFreq,
+                    maxFlowersForMerges: baseConfig.maxFlowersForMerges,
+                    targetFps: this.targetFPS,
+                    perfLevel: 'high'
                 };
                 break;
             case 'medium':
-                window.PERFORMANCE_CONFIG = { ...baseConfig, 
-                    maxParticles: Math.floor((baseConfig.maxParticles || 500) * 0.6), 
-                    mergeCheckFreq: (baseConfig.mergeCheckFreq || 2) + 1,
-                    maxFlowersForMerges: Math.floor((baseConfig.maxFlowersForMerges || 60) * 0.6)
+                window.PERFORMANCE_CONFIG = { ...baseConfig,
+                    maxParticles: Math.floor(baseConfig.maxParticles * 0.6),
+                    mergeCheckFreq: baseConfig.mergeCheckFreq + 1,
+                    maxFlowersForMerges: Math.floor(baseConfig.maxFlowersForMerges * 0.6),
+                    targetFps: Math.min(this.targetFPS, 45),
+                    perfLevel: 'medium'
                 };
                 break;
             case 'low':
-                window.PERFORMANCE_CONFIG = { ...baseConfig, 
-                    maxParticles: Math.floor((baseConfig.maxParticles || 500) * 0.3), 
-                    mergeCheckFreq: (baseConfig.mergeCheckFreq || 2) + 2,
-                    maxFlowersForMerges: Math.floor((baseConfig.maxFlowersForMerges || 60) * 0.3)
+                window.PERFORMANCE_CONFIG = { ...baseConfig,
+                    maxParticles: Math.floor(baseConfig.maxParticles * 0.3),
+                    mergeCheckFreq: baseConfig.mergeCheckFreq + 2,
+                    maxFlowersForMerges: Math.floor(baseConfig.maxFlowersForMerges * 0.3),
+                    targetFps: Math.min(this.targetFPS, 30),
+                    perfLevel: 'low'
                 };
                 break;
         }
-        
+
         // Apply physics settings based on quality level
         this.applyPhysicsSettings();
-        
+
+        // Rebuild static caches at the new resolution when quality changed
+        if (changed) {
+            if (typeof window.invalidateSceneCache === 'function') window.invalidateSceneCache();
+            if (typeof window.invalidateFlowerCache === 'function') window.invalidateFlowerCache();
+        }
+
         // Update particle system with new max particles
         if (state.particles) {
             state.particles.maxParticles = window.PERFORMANCE_CONFIG.maxParticles;

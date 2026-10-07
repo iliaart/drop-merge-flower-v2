@@ -3,9 +3,13 @@ import { state } from './state.js';
 import { CONFIG } from './config.js';
 import { getAllFlowersWithGenerated } from './random-flowers.js';
 import { clamp, ease, rgba, TAU } from './utils.js';
-import { getFlowerCache, getCacheScale } from './flower-cache.js';
+import { getFlowerCache, getCacheScale, invalidateFlowerCache } from './flower-cache.js';
 import { drawStamens } from './stamens.js';
 import { visualEffects } from './visual-effects.js';
+
+// Expose cache invalidators for the adaptive quality manager (performance.js)
+window.invalidateSceneCache = invalidateSceneCache;
+window.invalidateFlowerCache = invalidateFlowerCache;
 
 const { GW, GH, VASE, DANGER_Y, DROP_Y, GAME_OVER_GRACE } = CONFIG;
 
@@ -154,7 +158,9 @@ export function drawPreviewFlower(ctx, t) {
     ctx.translate(x, DROP_Y + bob);
     const sc = .85 + Math.sin(t * 2) * .05;
     ctx.scale(sc, sc);
-    ctx.drawImage(cache.canvas, -cache.cx * 2, -cache.cy * 2, cache.canvas.width, cache.canvas.height);
+    // dest size must be CSS-space (cache.w/h), not raw pixel size — otherwise
+    // the sprite is drawn scale-times too big and its center appears shifted.
+    ctx.drawImage(cache.canvas, -cache.cx, -cache.cy, cache.w, cache.h);
     drawStamens(ctx, state.currentLevel, r, t, 0, 0);
     ctx.restore();
 
@@ -198,7 +204,7 @@ export function drawNextPreview(ctx, t) {
     ctx.translate(VASE.r + 30, VASE.t + 30);
     ctx.globalAlpha = .5;
     ctx.scale(.5, .5);
-    ctx.drawImage(cache.canvas, -cache.cx * 2, -cache.cy * 2, cache.canvas.width, cache.canvas.height);
+    ctx.drawImage(cache.canvas, -cache.cx, -cache.cy, cache.w, cache.h);
     drawStamens(ctx, state.nextLevel, r, t, 1.5, 0);
     ctx.restore();
 
@@ -429,10 +435,10 @@ export function drawFlower(ctx, flower, t) {
         ctx.shadowColor = rgba(f.petalColor, glowAlpha * .8);
         ctx.shadowBlur = shouldSimplifyAnimations ? r * .4 * glowAlpha : r * .8 * glowAlpha; // Less blur on low performance
         ctx.globalAlpha = glowAlpha * .5;
-        ctx.drawImage(cache.canvas, -cache.cx * 2, -cache.cy * 2, cache.canvas.width, cache.canvas.height);
+        ctx.drawImage(cache.canvas, -cache.cx, -cache.cy, cache.w, cache.h);
         ctx.restore();
     }
-    ctx.drawImage(cache.canvas, -cache.cx * 2, -cache.cy * 2, cache.canvas.width, cache.canvas.height);
+    ctx.drawImage(cache.canvas, -cache.cx, -cache.cy, cache.w, cache.h);
     
     // Draw stamens regardless of performance since we removed FPS limitations
     drawStamens(ctx, flower.level, r, t, flower.stamenPhase, flower.squashS);

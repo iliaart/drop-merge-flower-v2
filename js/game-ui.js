@@ -3,13 +3,55 @@ import { state } from './state.js';
 import { CONFIG } from './config.js';
 import { getAllFlowersWithGenerated } from './random-flowers.js';
 import { clamp, ease, rgba, TAU } from './utils.js';
-import { getFlowerCache } from './flower-cache.js';
+import { getFlowerCache, getCacheScale } from './flower-cache.js';
 import { drawStamens } from './stamens.js';
 import { visualEffects } from './visual-effects.js';
 
 const { GW, GH, VASE, DANGER_Y, DROP_Y, GAME_OVER_GRACE } = CONFIG;
 
-export function drawBackground(ctx) {
+// ─── Static scene cache ─────────────────────────────────────────────
+// Background + vase never change between frames (7 gradients and ~85% of the
+// canvas re-filled every frame was one of the biggest costs on weak mobile
+// GPUs). We render them once into an offscreen canvas and blit it per frame.
+let sceneCache = null;
+let sceneCacheKey = '';
+
+function renderSceneCache() {
+    const scale = getCacheScale();
+    const oc = document.createElement('canvas');
+    oc.width = Math.round(GW * scale);
+    oc.height = Math.round(GH * scale);
+    const c = oc.getContext('2d');
+    c.scale(scale, scale);
+
+    paintBackground(c);
+    paintVase(c);
+
+    return { canvas: oc, w: GW, h: GH };
+}
+
+export function invalidateSceneCache() {
+    if (sceneCache && sceneCache.canvas) sceneCache.canvas.width = sceneCache.canvas.height = 0;
+    sceneCache = null;
+    sceneCacheKey = '';
+}
+
+function ensureSceneCache(ctx) {
+    const key = `${window.PERFORMANCE_CONFIG?.perfLevel || ''}|${getCacheScale()}`;
+    if (!sceneCache || sceneCacheKey !== key) {
+        sceneCache = renderSceneCache();
+        sceneCacheKey = key;
+    }
+    // Draw at logical size (ctx is already scaled by DPR in resizeCanvas)
+    ctx.drawImage(sceneCache.canvas, 0, 0, GW, GH);
+}
+
+/** Public entry point used by the render loop */
+export function drawStaticScene(ctx) {
+    ensureSceneCache(ctx);
+}
+
+function paintBackground(ctx) {
     const bg = ctx.createLinearGradient(0, 0, 0, GH);
     bg.addColorStop(0, '#2a1f30');
     bg.addColorStop(.3, '#1f1828');
@@ -18,8 +60,6 @@ export function drawBackground(ctx) {
     ctx.fillStyle = bg;
     ctx.fillRect(0, 0, GW, GH);
 
-    // Draw glow regardless of performance since we removed FPS limitations
-    const perfConfig = window.PERFORMANCE_CONFIG || {};
     const glow = ctx.createRadialGradient(GW / 2, GH * .55, 50, GW / 2, GH * .55, 350);
     glow.addColorStop(0, 'rgba(80,50,60,0.25)');
     glow.addColorStop(.5, 'rgba(50,30,40,0.1)');
@@ -28,7 +68,12 @@ export function drawBackground(ctx) {
     ctx.fillRect(0, 0, GW, GH);
 }
 
-export function drawVase(ctx) {
+/** Kept for backward compatibility (used only via the scene cache now) */
+export function drawBackground(ctx) {
+    paintBackground(ctx);
+}
+
+function paintVase(ctx) {
     const l = VASE.l, r = VASE.r, t = VASE.t, b = VASE.b;
     const w = r - l, h = b - t;
     const wallW = 8, rimH = 12;
@@ -51,6 +96,10 @@ export function drawVase(ctx) {
     ctx.stroke();
     ctx.setLineDash([]);
     ctx.restore();
+}
+
+export function drawVase(ctx) {
+    paintVase(ctx);
 }
 
 function drawVaseWall(ctx, l, r, t, h, wallW, rimH) {

@@ -13,6 +13,34 @@ import {
 // Flower cache for offscreen rendering
 const flowerCache = new Map();
 
+/** Cache scale factor: 2x on capable devices, lower on weak mobile GPUs */
+export function getCacheScale() {
+    const cfg = window.PERFORMANCE_CONFIG;
+    if (cfg && cfg.isLowEndDevice) return 1.5;
+    if (cfg && cfg.isMobile) return 1.5;
+    return 2;
+}
+
+/** Drop all cached canvases (e.g. after restart / flower pool reset) so old
+ *  offscreen buffers don't leak memory across sessions. */
+export function invalidateFlowerCache(level) {
+    if (level === undefined) {
+        for (const data of flowerCache.values()) {
+            if (data.canvas) {
+                // release GPU/CPU backing store immediately
+                data.canvas.width = data.canvas.height = 0;
+            }
+        }
+        flowerCache.clear();
+    } else {
+        const data = flowerCache.get(level);
+        if (data) {
+            if (data.canvas) data.canvas.width = data.canvas.height = 0;
+            flowerCache.delete(level);
+        }
+    }
+}
+
 /** Get or create cached offscreen canvas for a flower level */
 export function getFlowerCache(level) {
     if (flowerCache.has(level)) return flowerCache.get(level);
@@ -27,11 +55,12 @@ export function getFlowerCache(level) {
     const totalH = (r + pad) * 2;
     const cx = totalW / 2, cy = totalH / 2;
 
+    const scale = getCacheScale();
     const oc = document.createElement('canvas');
-    oc.width = totalW * 2;  // 2x for retina
-    oc.height = totalH * 2;
+    oc.width = Math.round(totalW * scale);
+    oc.height = Math.round(totalH * scale);
     const c = oc.getContext('2d');
-    c.scale(2, 2);
+    c.scale(scale, scale);
 
     // Draw bloom shadow (soft)
     c.save();

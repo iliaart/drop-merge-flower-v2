@@ -28,6 +28,16 @@ import {
 // Store generated flowers during gameplay
 let generatedFlowers = [];
 
+// Memoized snapshot returned by getAllFlowersWithGenerated().
+// Copying [...generatedFlowers] on every call was one of the hottest allocations
+// in the frame loop (drawFlower / drawStamens / checkMerges / input handlers all
+// call it several times per frame). The snapshot is rebuilt only when the pool
+// actually changes (generation / reset).
+let flowersSnapshot = null;
+function invalidateFlowersSnapshot() {
+    flowersSnapshot = null;
+}
+
 // Counter for tracking generation order
 let generationCounter = 0;
 
@@ -265,10 +275,11 @@ function generateRandomFlower() {
 
 /**
  * Get all generated flowers
- * @returns {Array} Array of generated flower objects
+ * @returns {Array} Array of generated flower objects (memoized copy)
  */
 function getAllFlowersWithGenerated() {
-    return [...generatedFlowers];
+    if (!flowersSnapshot) flowersSnapshot = [...generatedFlowers];
+    return flowersSnapshot;
 }
 
 /**
@@ -276,6 +287,7 @@ function getAllFlowersWithGenerated() {
  */
 function resetGeneratedFlowers() {
     generatedFlowers = [];
+    invalidateFlowersSnapshot();
     generationCounter = 0; // Reset the generation counter as well
     // Reset the recent colors tracking to allow full color diversity again
     for (let key in recentColors) {
@@ -320,6 +332,7 @@ function generateRandomFlowerBatch(count) {
         generatedFlowers.push(flower);
         addToRecentFlowers(flower);
     }
+    invalidateFlowersSnapshot();
     
     // Automatically log flower info if we've generated 50 flowers
     if (count === 50) {
@@ -381,6 +394,7 @@ if (typeof window !== 'undefined') {
         flower.generationNumber = ++generationCounter;
         generatedFlowers.push(flower);
         addToRecentFlowers(flower);
+        invalidateFlowersSnapshot();
         return flower;
     };
     window.generateRandomFlowerBatch = (count) => {
@@ -390,6 +404,7 @@ if (typeof window !== 'undefined') {
             generatedFlowers.push(flower);
             addToRecentFlowers(flower);
         }
+        invalidateFlowersSnapshot();
         
         // Automatically log flower info if we've generated 50 flowers
         if (count === 50) {

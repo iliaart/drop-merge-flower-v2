@@ -3,7 +3,7 @@ import { state } from './state.js';
 import { CONFIG } from './config.js';
 import { dropFlower } from './game.js';
 import { getAllFlowersWithGenerated } from './random-flowers.js';
-import { wakeNewFlower, wakeFlower } from './game/sleep-system.js';
+import { wakeNewFlower } from './game/sleep-system.js';
 
 const { GW, GH } = CONFIG;
 

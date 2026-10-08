@@ -22,7 +22,7 @@ import { checkMerges } from './game/spatial-grid.js';
 import { updateFlowers, updateSquash } from './game/update-loop.js';
 import { updateCinema, applyMergeAttraction } from './game/merge-cinema.js';
 import { updateSleep, wakeNearMerge, wakeFlower } from './game/sleep-system.js';
-import { renderFrame } from './game/render-loop.js';
+import { renderFrame, updateFlowerTail } from './game/render-loop.js';
 import { shouldSkipFrame } from './game/utils.js';
 
 const { GW, GH, VASE, DANGER_Y, DROP_Y, MAX_LEVEL, GAME_OVER_GRACE, MERGE_RADIUS_BONUS, SQUASH_FREQ, SQUASH_DAMP, MAX_FLOWER_TYPES, MAX_TYPES_AT_FULL, ADAPTIVE_FILL_THRESHOLD } = CONFIG;
@@ -42,6 +42,13 @@ let lastPerformanceCheck = 0;
 
 // State variable for mouse/touch hold instead of global variable
 let isMouseDown = false;
+
+// Frame counter used to throttle per-frame maintenance passes (auto-merge,
+// cinematic step-skipping). Plain number — zero allocation.
+let _frameCounter = 0;
+// EMA of real FPS (updated once per second) — drives adaptive degradation
+// during merge cinematics (blur off / fewer particles on weak devices).
+let _fpsAvg = 60;
 
 /** Initialize game with canvas, context, restart button, and Matter.js */
 export async function initGame(canvasEl, ctxEl, restartBtnEl, MatterLib) {
@@ -102,8 +109,27 @@ function gameLoop(timestamp) {
 
     // Cinematic slow-motion: time scale lerps back to normal after each merge
     updateCinema(dt, timestamp / 1000);
+    const cinematicActive = state.timeScale < 0.95 && state.gameState === 'playing';
     const sdt = dt * state.timeScale; // slowed (scene) time
     state.time += sdt;
+
+    // ── MERGE-FPS FIX: adaptive degradation ───────────────────────────────────
+    // A merge used to cost THREE full-scene passes per frame (slow-mo attraction
+    // + O(n²) overlap scan + async auto-merge) plus blur/glow re-rendering of
+    // every flower — on mid devices FPS collapsed exactly when flowers merged.
+    // Now during a short cinematic we run ONE merge-detection pass every other
+    // frame and skip the redundant scans. Slow-mo lasts ~0.25s, so this halves
+    // the merge-frame CPU load while remaining visually identical.
+    _frameCounter++;
+    let doMergePass = true;
+    if (cinematicActive) {
+        if (_fpsAvg < 45) {
+            // Weak device: single detection pass every 3rd frame
+            doMergePass = (_frameCounter % 3) === 0;
+        } else {
+            doMergePass = (_frameCounter & 1) === 0;
+        }
+    }
 
     // Update physics using the state's Matter reference
     if (state.Matter && state.Matter.Engine) {
@@ -117,7 +143,7 @@ function gameLoop(timestamp) {
     updateSleep(dt);
 
     // During slow-mo same-level flowers are cinematically attracted to each other
-    applyMergeAttraction();
+    if (doMergePass) applyMergeAttraction();
 
     // Update flower states
     for (const f of state.flowers) {
@@ -132,22 +158,30 @@ function gameLoop(timestamp) {
         updateSquash(f, sdt);
     }
 
-    // Update flower tails for dragged or kinematic flowers
-    import('./game/render-loop.js').then(renderModule => {
-        for (const f of state.flowers) {
-            if (!f || f.sleeping) continue;
-            renderModule.updateFlowerTail(f, currentTime);
-        }
-    });
+    // FPS FIX: update tails ONLY for the dragged / just-dropped flower — that is
+    // the single tail the renderer ever draws. The old code fired a dynamic
+    // import() promise EVERY frame (microtask + GC churn per frame) and pushed
+    // 40-point tail history for every moving body (during merge cascades almost
+    // every flower moves → dozens of arrays × slice-copies per frame).
+    const tailF = state.selectedFlower;
+    if (tailF && !tailF.sleeping) {
+        updateFlowerTail(tailF, currentTime);
+    }
 
     // Perform merge checks less frequently based on performance config
-    if (Math.floor(state.time * 10) % perfConfig.mergeCheckFreq === 0) { // Check every N frames based on performance
+    if (doMergePass && Math.floor(state.time * 10) % perfConfig.mergeCheckFreq === 0) { // Check every N frames based on performance
         checkMerges();
-        forceOverlapMerges();
+        // forceOverlapMerges() is a redundant O(n²) full-scene scan — the spatial
+        // grid check above already catches overlapping same-level pairs. Running
+        // BOTH every merge frame doubled the cost exactly during merge cascades.
+        // It now only runs when no cinematic is active (safety net for stuck pairs).
+        if (!cinematicActive) forceOverlapMerges();
     }
     // Fire the queued cascade merge once the 0.3s gap elapsed (player can follow each merge)
     processPendingMerges();
-    autoMergeExcessTypes();
+    // Auto-merge does an async dynamic import of core.js + two O(n) scans EVERY
+    // frame; type count only changes on merges/drops, so throttle it to ~4 Hz.
+    if (_frameCounter % 15 === 0) autoMergeExcessTypes();
 
     if (state.dropCooldown > 0) {
         state.dropCooldown -= dt;
